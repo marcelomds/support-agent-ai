@@ -1,5 +1,5 @@
 /**
- * Database schema for the StreamBox domain (phase 1).
+ * Database schema: the StreamBox domain plus the tables the agent needs.
  *
  * Conventions:
  * - Money is stored as integer cents (never floats) in a single currency (USD).
@@ -8,14 +8,18 @@
  *
  * See docs/01-schema-and-tools.md for the reasoning behind each table.
  */
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  customType,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uuid,
 } from 'drizzle-orm/pg-core';
 
 export const planTier = pgEnum('plan_tier', ['basic', 'standard', 'premium']);
@@ -106,7 +110,107 @@ export const payments = pgTable(
   (t) => [index('payments_subscription_id_idx').on(t.subscriptionId)],
 );
 
+export const refundStatus = pgEnum('refund_status', [
+  'pending_approval', // above the threshold, waiting for a human
+  'refunded',
+  'rejected',
+]);
+
+/** A refund request made through the agent, and what happened to it. */
+export const refunds = pgTable(
+  'refunds',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity(),
+    paymentId: integer('payment_id')
+      .notNull()
+      .references(() => payments.id),
+    customerId: integer('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    amountCents: integer('amount_cents').notNull(),
+    reason: text().notNull(),
+    /** Which rule made the payment eligible: within_window or duplicate_charge. */
+    rule: text().notNull(),
+    status: refundStatus().notNull(),
+    decidedBy: text('decided_by'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('refunds_status_idx').on(t.status)],
+);
+
+/**
+ * The model API is stateless: it remembers nothing between requests.
+ * A conversation is the list of messages we store and send back every time.
+ */
+export const conversations = pgTable('conversations', {
+  id: uuid().primaryKey().defaultRandom(),
+  customerId: integer('customer_id')
+    .notNull()
+    .references(() => customers.id),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const messages = pgTable(
+  'messages',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id),
+    role: text().notNull(), // 'user' | 'assistant'
+    /** Exactly what is sent to the model: text, tool calls and tool results. */
+    content: jsonb().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('messages_conversation_id_idx').on(t.conversationId)],
+);
+
+/** Every tool call the agent makes and every human decision. Append-only. */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity(),
+    customerId: integer('customer_id'),
+    conversationId: uuid('conversation_id'),
+    actor: text().notNull(), // 'agent' | 'human'
+    action: text().notNull(), // tool name or human decision
+    input: jsonb(),
+    result: jsonb(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('audit_log_customer_id_idx').on(t.customerId)],
+);
+
+const tsvector = customType<{ data: string }>({
+  dataType: () => 'tsvector',
+});
+
+/** Policy documents split into sections, searchable by keyword. */
+export const policyChunks = pgTable(
+  'policy_chunks',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity(),
+    document: text().notNull(), // source file, e.g. "refunds.md"
+    heading: text().notNull(),
+    content: text().notNull(),
+    searchVector: tsvector('search_vector').generatedAlwaysAs(
+      sql`to_tsvector('english', heading || ' ' || content)`,
+    ),
+  },
+  (t) => [index('policy_chunks_search_idx').using('gin', t.searchVector)],
+);
+
 export type Plan = typeof plans.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type Refund = typeof refunds.$inferSelect;

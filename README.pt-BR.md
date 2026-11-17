@@ -22,7 +22,7 @@ mão sobre o SDK do modelo, para que cada passo fique visível.
 | 3 | Documentos de política, ingestão com fila e busca | Embeddings, busca híbrida (palavra-chave + significado), filas | ✅ feito |
 | 4 | Ferramentas de ação com regras de negócio e aprovação humana | Guardrails, humano no circuito, auditoria | ✅ feito |
 | 5 | Evals com o modelo real, com o acerto medido em número | Evals, correção pelo estado final, LLM-as-judge | ✅ feito; [primeiros resultados](apps/api/evals/results/2026-11-17-first-run.md) |
-| 6 | Servidor MCP e skills | MCP, skills | ⏳ |
+| 6 | Servidor MCP e skills | MCP, skills (instruções carregadas sob demanda) | ✅ feito |
 | 7 | Confirmação garantida por código, tela de métricas | Guardrails fora do prompt, observabilidade | ✅ feito |
 
 > **Medido com o modelo real.** São 17 conversas de eval, corrigidas pelo que
@@ -105,7 +105,7 @@ pnpm test
 ## Evals
 
 Os testes conferem o encanamento com um modelo simulado. Os evals conferem o
-modelo real: 17 conversas curtas, cada uma corrigida pelo que ficou no banco e
+modelo real: 20 conversas curtas, cada uma corrigida pelo que ficou no banco e
 por afirmações sobre a resposta que um segundo modelo marca como verdadeiras
 ou falsas.
 
@@ -116,6 +116,22 @@ pnpm --filter api evals
 Isso chama a API da Anthropic (cerca de US$ 0,36 por rodada completa, valor medido) e grava
 `apps/api/evals/results/latest.md`. Os casos ficam em
 [`apps/api/evals/cases.ts`](apps/api/evals/cases.ts).
+
+## Skills e MCP
+
+**Skills** são procedimentos que o agente carrega só quando precisa. O prompt
+lista uma linha por roteiro; o texto completo vem da ferramenta `load_skill`.
+Eles ficam em [`apps/api/src/streambox/skills`](apps/api/src/streambox/skills).
+
+**MCP** publica as mesmas ferramentas pelo Model Context Protocol, para que
+outras aplicações de IA possam usá-las:
+
+```bash
+MCP_CUSTOMER_ID=1 pnpm --filter api mcp:start
+```
+
+O servidor age em nome de um cliente de exemplo, fixado na inicialização, e é
+só de leitura, a menos que `MCP_ALLOW_WRITES=true` esteja definido.
 
 ## Documentação
 

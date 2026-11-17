@@ -274,3 +274,37 @@ confirmation cards are confirmed or cancelled.
 **Not built:** alerts, per-step timing inside an answer, and model routing.
 Routing (a cheaper model for simple questions) is now a measurable question:
 run the evals with another `ANTHROPIC_MODEL` and compare score and cost.
+
+## 027 — Skills: procedures loaded on demand
+**Decision:** Step-by-step procedures (how to recommend a plan, how to handle
+a failed payment, how to handle a disputed refund) live in markdown files. The
+system prompt lists only each one's name and when to use it; the agent fetches
+the full text with a `load_skill` tool when a conversation calls for it.
+**Why not put them all in the prompt:** Every request would pay for every
+procedure, and instructions for situations that are not happening compete for
+the model's attention with the ones that are.
+**Where it lives:** The mechanism (parse, list, load) is in the agent core,
+because it knows nothing about subscriptions. The three playbooks are in the
+StreamBox domain.
+**Trade-off:** The agent has to notice that a playbook applies and spend one
+extra step loading it. Whether it does is a question for the evals.
+
+## 028 — An MCP server built from the same tools
+**Decision:** `pnpm --filter api mcp:start` runs an MCP server that publishes
+the same tool objects the agent loop uses. Nothing is defined twice.
+**Why:** MCP is the standard way for AI applications to discover and call
+tools. Publishing through it means another client (a desktop assistant, an
+IDE, another agent) can use the StreamBox tools without this project's loop.
+It is also the test of the core/domain split: a second consumer of the tools
+needed no change to them.
+**The customer is fixed at start-up** (`MCP_CUSTOMER_ID`). An MCP connection
+has no chat session, and the rule from decision 008 still holds: the caller
+never chooses whose data to read.
+**Read-only by default.** Action tools are published only with
+`MCP_ALLOW_WRITES=true`. There is no confirmation card over MCP, so the
+client application's own approval prompt is the confirmation. The business
+rules still apply either way.
+**Built with the SDK's low-level server**, answering "list tools" and "call
+tool" directly, so both requests are visible in about 60 lines.
+**Not done:** A remote (HTTP) transport with authentication. The server runs
+locally over standard input/output.

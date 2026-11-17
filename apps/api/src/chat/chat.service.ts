@@ -143,7 +143,7 @@ export class ChatService {
 
     const run = await runAgent({
       model: this.model,
-      system: buildSystemPrompt(this.clock.now(), turn.language),
+      system: buildSystemPrompt(this.clock.now(), turn.language, this.tools.describeSkills()),
       tools: this.tools.all(),
       messages: [...history, ...incoming],
       context,

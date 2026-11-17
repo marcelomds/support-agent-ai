@@ -6,7 +6,9 @@
  * ask for another customer's data because there is no parameter to ask with.
  */
 import { Inject, Injectable } from '@nestjs/common';
+import path from 'node:path';
 import { z } from 'zod';
+import { createLoadSkillTool, describeSkills, loadSkills, type Skill } from '../agent/skills.js';
 import { defineTool, type ActionPreview, type AgentTool } from '../agent/tool.js';
 import { DB, dryRun, type Database, type Transaction } from '../db/database.module.js';
 import { AccountService } from './account.service.js';
@@ -16,6 +18,9 @@ import { SubscriptionService } from './subscription.service.js';
 
 @Injectable()
 export class StreamboxTools {
+  /** Playbooks the agent can load on demand. Read once, when the app starts. */
+  readonly skills: Skill[] = loadSkills(path.join(import.meta.dirname, 'skills'));
+
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly account: AccountService,
@@ -39,8 +44,15 @@ export class StreamboxTools {
       : { confirm: true, details: outcome };
   }
 
+  /** One line per playbook, for the system prompt. */
+  describeSkills(): string {
+    return describeSkills(this.skills);
+  }
+
   all(): AgentTool[] {
     return [
+      createLoadSkillTool(this.skills),
+
       defineTool({
         name: 'get_subscription',
         kind: 'read',

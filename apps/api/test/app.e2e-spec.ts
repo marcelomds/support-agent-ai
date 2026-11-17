@@ -104,6 +104,21 @@ describe('API (e2e)', () => {
     await request(app.getHttpServer()).get('/customers/999/account').expect(404);
   });
 
+  it('lists playbooks in the prompt and returns one in full when the agent loads it', async () => {
+    await boot([
+      fakeMessage([toolUse('load_skill', { name: 'plan-recommendation' })]),
+      fakeMessage([text('How many people watch at the same time?')]),
+    ]);
+    await request(app.getHttpServer())
+      .post('/chat').send({ customerId: CUSTOMER.alice, message: 'Which plan should I get?' }).expect(201);
+
+    // The prompt has the title and when to use it, but not the procedure.
+    expect(model.requests[0].system).toContain('- plan-recommendation: Use when the customer asks which plan to choose');
+    expect(model.requests[0].system).not.toContain('Map the need to a tier');
+    const loaded = model.requests[1].messages.at(-1)!.content as { content: string }[];
+    expect(JSON.parse(loaded[0].content).instructions).toContain('Map the need to a tier');
+  });
+
   it('rejects an invalid body', async () => {
     await boot([]);
     await request(app.getHttpServer()).post('/chat').send({ customerId: 'x', message: '' }).expect(400);

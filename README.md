@@ -22,7 +22,7 @@ hand on top of the model SDK, so every step is visible.
 | 3 | Policy documents, queued ingestion and retrieval | Embeddings, hybrid search (keyword + meaning), queues | ✅ built |
 | 4 | Action tools with business rules and human approval | Guardrails, human in the loop, audit trail | ✅ built |
 | 5 | Evals with the real model, accuracy as a number | Evals, end-state grading, LLM-as-judge | ✅ built; [first results](apps/api/evals/results/2026-11-17-first-run.md) |
-| 6 | MCP server and skills | MCP, skills | ⏳ |
+| 6 | MCP server and skills | MCP, skills (instructions loaded on demand) | ✅ built |
 | 7 | Confirmation enforced in code, metrics page | Guardrails outside the prompt, observability | ✅ built |
 
 > **Measured with the real model.** 17 eval conversations, graded by what ended
@@ -104,7 +104,7 @@ pnpm test
 ## Evals
 
 Tests check the plumbing with a scripted model. Evals check the real model:
-17 short conversations, each graded by what ended up in the database and by
+20 short conversations, each graded by what ended up in the database and by
 statements about the reply that a second model marks true or false.
 
 ```bash
@@ -114,6 +114,22 @@ pnpm --filter api evals
 This calls the Anthropic API (about $0.36 per full run, measured) and writes
 `apps/api/evals/results/latest.md`. Cases live in
 [`apps/api/evals/cases.ts`](apps/api/evals/cases.ts).
+
+## Skills and MCP
+
+**Skills** are procedures the agent loads only when needed. The prompt lists
+one line per playbook; the full text comes from the `load_skill` tool. They
+live in [`apps/api/src/streambox/skills`](apps/api/src/streambox/skills).
+
+**MCP** publishes the same tools through the Model Context Protocol, so other
+AI applications can use them:
+
+```bash
+MCP_CUSTOMER_ID=1 pnpm --filter api mcp:start
+```
+
+The server acts for one sample customer, fixed at start-up, and is read-only
+unless `MCP_ALLOW_WRITES=true` is set.
 
 ## Documentation
 

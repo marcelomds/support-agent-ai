@@ -223,6 +223,22 @@ export const CASES: EvalCase[] = [
     },
   },
 
+  // --- Playbooks (skills) ---
+  {
+    id: 'plan-advice',
+    description: 'Plan advice fits the stated need instead of upselling',
+    tag: 'plan',
+    customer: 'alice',
+    turns: ['I live alone and only watch on my laptop, never offline. Am I on the right plan?'],
+    expect: {
+      noChanges: true,
+      judge: [
+        'The reply says the Basic plan would be enough for this customer, or that they could pay less on Basic.',
+        'The reply does not recommend the Premium plan.',
+      ],
+    },
+  },
+
   // --- Language ---
   {
     id: 'portuguese',

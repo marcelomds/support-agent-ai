@@ -126,6 +126,20 @@ const en = {
   colTokens: 'Tokens in / out',
   colCost: 'Cost',
   colTime: 'Time',
+
+  homeEyebrow: 'AI support agent · demo',
+  homeTitle: 'An agent that answers, acts and stays within the rules',
+  homeLead: 'It answers customers from their own account and the company policies, prepares refunds, plan changes and cancellations, and only acts when the customer presses Confirm.',
+  homeEnter: 'Open the console',
+  homeBack: 'Back to the start',
+  homeFeature1Title: 'Talks from real data',
+  homeFeature1Text: 'Every fact comes from the account or the policies, looked up at the moment of the question.',
+  homeFeature2Title: 'Rules it cannot bend',
+  homeFeature2Text: 'Refund limits live in the code. Actions wait for a button press, and large refunds for a person.',
+  homeFeature3Title: 'Everything on record',
+  homeFeature3Text: 'Each tool call and each decision is written to an audit log you can read.',
+  homeFeature4Title: 'Measured, not assumed',
+  homeFeature4Text: 'Cost and time per answer, and a set of test conversations graded on every change.',
 }
 
 type Dictionary = typeof en
@@ -248,6 +262,20 @@ const pt: Dictionary = {
   colTokens: 'Tokens entrada / saída',
   colCost: 'Custo',
   colTime: 'Tempo',
+
+  homeEyebrow: 'Agente de atendimento com IA · demonstração',
+  homeTitle: 'Um agente que responde, age e respeita as regras',
+  homeLead: 'Ele responde ao cliente com base na conta dele e nas políticas da empresa, prepara reembolsos, trocas de plano e cancelamentos, e só age quando o cliente aperta Confirmar.',
+  homeEnter: 'Abrir o console',
+  homeBack: 'Voltar ao início',
+  homeFeature1Title: 'Fala com dados reais',
+  homeFeature1Text: 'Cada informação vem da conta ou das políticas, consultadas na hora da pergunta.',
+  homeFeature2Title: 'Regras que ele não dobra',
+  homeFeature2Text: 'Os limites de reembolso ficam no código. Ações esperam um botão, e reembolsos altos esperam uma pessoa.',
+  homeFeature3Title: 'Tudo registrado',
+  homeFeature3Text: 'Cada ferramenta chamada e cada decisão ficam num log de auditoria que você pode ler.',
+  homeFeature4Title: 'Medido, não presumido',
+  homeFeature4Text: 'Custo e tempo por resposta, e um conjunto de conversas de teste corrigidas a cada mudança.',
 }
 
 const es: Dictionary = {
@@ -368,6 +396,20 @@ const es: Dictionary = {
   colTokens: 'Tokens entrada / salida',
   colCost: 'Coste',
   colTime: 'Tiempo',
+
+  homeEyebrow: 'Agente de soporte con IA · demostración',
+  homeTitle: 'Un agente que responde, actúa y respeta las reglas',
+  homeLead: 'Responde al cliente a partir de su cuenta y de las políticas de la empresa, prepara reembolsos, cambios de plan y cancelaciones, y solo actúa cuando el cliente pulsa Confirmar.',
+  homeEnter: 'Abrir la consola',
+  homeBack: 'Volver al inicio',
+  homeFeature1Title: 'Habla con datos reales',
+  homeFeature1Text: 'Cada dato viene de la cuenta o de las políticas, consultadas en el momento de la pregunta.',
+  homeFeature2Title: 'Reglas que no puede saltarse',
+  homeFeature2Text: 'Los límites de reembolso están en el código. Las acciones esperan un botón, y los reembolsos altos, a una persona.',
+  homeFeature3Title: 'Todo queda registrado',
+  homeFeature3Text: 'Cada herramienta llamada y cada decisión quedan en un registro de auditoría que puedes leer.',
+  homeFeature4Title: 'Medido, no supuesto',
+  homeFeature4Text: 'Coste y tiempo por respuesta, y un conjunto de conversaciones de prueba corregidas en cada cambio.',
 }
 
 const DICTIONARIES: Record<Language, Dictionary> = { en, pt, es }

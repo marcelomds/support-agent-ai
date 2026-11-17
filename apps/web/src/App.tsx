@@ -4,6 +4,7 @@ import { getAccount, listCustomers, type Account, type Customer } from './api'
 import { Approvals } from './Approvals'
 import { Audit } from './Audit'
 import { Chat } from './Chat'
+import { Home } from './Home'
 import { Metrics } from './Metrics'
 import { LANGUAGES, useI18n, type Language } from './i18n'
 import { ApprovalIcon, AuditIcon, ChatIcon, GlobeIcon, Logo, MetricsIcon } from './icons'
@@ -12,6 +13,8 @@ type Page = 'chat' | 'approvals' | 'audit' | 'metrics'
 
 export default function App() {
   const { t, language, setLanguage } = useI18n()
+  // The app opens on the start screen; the console comes after.
+  const [entered, setEntered] = useState(false)
   const [page, setPage] = useState<Page>('chat')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerId, setCustomerId] = useState<number | null>(null)
@@ -51,10 +54,12 @@ export default function App() {
   ] as const
   const current = pages.find((p) => p.id === page)!
 
+  if (!entered) return <Home onEnter={() => setEntered(true)} />
+
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">
+        <button type="button" className="brand brand-link" onClick={() => setEntered(false)} title={t.homeBack}>
           <div className="avatar logo">
             <Logo />
           </div>
@@ -62,7 +67,7 @@ export default function App() {
             <strong>StreamBox</strong>
             <span>{t.brandTagline}</span>
           </div>
-        </div>
+        </button>
 
         <nav>
           {pages.map(({ id, label, icon }) => (

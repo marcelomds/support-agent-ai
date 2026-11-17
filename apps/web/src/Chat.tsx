@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { streamChat, type ChatResult, type Customer } from './api'
+import { useI18n } from './i18n'
+import { Logo, SendIcon } from './icons'
 
 interface ToolStep {
   name: string
@@ -16,22 +18,22 @@ interface Turn {
   error?: string
 }
 
-const SUGGESTIONS = [
-  'What plan am I on?',
-  'When was my last charge?',
-  'Can I get a refund?',
-  'What happens if I cancel today?',
-]
+interface Props {
+  customer: Customer
+  /** Called after each answer, so the account panel can show what changed. */
+  onAnswered: () => void
+}
 
-export function Chat({ customer }: { customer: Customer }) {
+export function Chat({ customer, onAnswered }: Props) {
+  const { t, fill, language } = useI18n()
   const [turns, setTurns] = useState<Turn[]>([])
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const conversationId = useRef<string | undefined>(undefined)
-  const bottom = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: 'end' })
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight })
   }, [turns])
 
   // Updates the assistant turn being streamed (always the last one).
@@ -48,29 +50,33 @@ export function Chat({ customer }: { customer: Customer }) {
       { role: 'assistant', text: '', tools: [] },
     ])
     try {
-      await streamChat({ customerId: customer.id, conversationId: conversationId.current, message }, (event) => {
-        if (event.type === 'text') {
-          updateLast((t) => ({ ...t, text: t.text + event.delta }))
-        } else if (event.type === 'tool_call') {
-          updateLast((t) => ({ ...t, tools: [...t.tools, { name: event.name, input: event.input }] }))
-        } else if (event.type === 'tool_result') {
-          updateLast((t) => ({
-            ...t,
-            tools: t.tools.map((tool, i) =>
-              i === t.tools.length - 1 ? { ...tool, ok: event.ok, result: event.result } : tool,
-            ),
-          }))
-        } else if (event.type === 'done') {
-          conversationId.current = event.conversationId
-          updateLast((t) => ({ ...t, text: event.reply, result: event }))
-        } else if (event.type === 'error') {
-          updateLast((t) => ({ ...t, error: event.message }))
-        }
-      })
+      await streamChat(
+        { customerId: customer.id, conversationId: conversationId.current, message, language },
+        (event) => {
+          if (event.type === 'text') {
+            updateLast((turn) => ({ ...turn, text: turn.text + event.delta }))
+          } else if (event.type === 'tool_call') {
+            updateLast((turn) => ({ ...turn, tools: [...turn.tools, { name: event.name, input: event.input }] }))
+          } else if (event.type === 'tool_result') {
+            updateLast((turn) => ({
+              ...turn,
+              tools: turn.tools.map((tool, i) =>
+                i === turn.tools.length - 1 ? { ...tool, ok: event.ok, result: event.result } : tool,
+              ),
+            }))
+          } else if (event.type === 'done') {
+            conversationId.current = event.conversationId
+            updateLast((turn) => ({ ...turn, text: event.reply, result: event }))
+          } else if (event.type === 'error') {
+            updateLast((turn) => ({ ...turn, error: event.message }))
+          }
+        },
+      )
     } catch (error) {
-      updateLast((t) => ({ ...t, error: error instanceof Error ? error.message : 'Request failed' }))
+      updateLast((turn) => ({ ...turn, error: error instanceof Error ? error.message : t.requestFailed }))
     } finally {
       setBusy(false)
+      onAnswered()
     }
   }
 
@@ -79,19 +85,36 @@ export function Chat({ customer }: { customer: Customer }) {
     void send(draft)
   }
 
+  const reset = () => {
+    conversationId.current = undefined
+    setTurns([])
+  }
+
   return (
-    <section className="chat">
-      <div className="messages">
+    <section className="card chat">
+      <div className="chat-head">
+        <div className="avatar logo">
+          <Logo />
+        </div>
+        <div className="chat-head-text">
+          <strong>{t.assistantName}</strong>
+          <span>{t.assistantStatus}</span>
+        </div>
+        {turns.length > 0 && (
+          <button type="button" className="ghost" onClick={reset} disabled={busy}>
+            {t.newChat}
+          </button>
+        )}
+      </div>
+
+      <div className="messages" ref={scroller}>
         {turns.length === 0 && (
           <div className="empty">
-            <p>
-              You are signed in as <strong>{customer.name}</strong>. Ask about your subscription, payments or
-              StreamBox policies.
-            </p>
+            <p>{fill(t.emptyGreeting, { name: customer.name.split(' ')[0] })}</p>
             <div className="suggestions">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" onClick={() => void send(s)}>
-                  {s}
+              {t.suggestions.map((suggestion) => (
+                <button key={suggestion} type="button" onClick={() => void send(suggestion)}>
+                  {suggestion}
                 </button>
               ))}
             </div>
@@ -101,23 +124,29 @@ export function Chat({ customer }: { customer: Customer }) {
           <div key={i} className={`turn ${turn.role}`}>
             {turn.tools.length > 0 && <Trace tools={turn.tools} />}
             {turn.text && <div className="bubble">{turn.text}</div>}
-            {turn.role === 'assistant' && !turn.text && !turn.error && <div className="bubble muted">Thinking…</div>}
+            {turn.role === 'assistant' && !turn.text && !turn.error && (
+              <div className="bubble typing" aria-label={t.thinking}>
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
             {turn.error && <div className="bubble error">{turn.error}</div>}
             {turn.result && <Stats result={turn.result} />}
           </div>
         ))}
-        <div ref={bottom} />
       </div>
+
       <form className="composer" onSubmit={onSubmit}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Type your message"
-          aria-label="Message"
+          placeholder={t.placeholder}
+          aria-label={t.placeholder}
           disabled={busy}
         />
-        <button type="submit" disabled={busy || !draft.trim()}>
-          Send
+        <button type="submit" className="primary icon" disabled={busy || !draft.trim()} aria-label={t.send}>
+          <SendIcon />
         </button>
       </form>
     </section>
@@ -126,16 +155,20 @@ export function Chat({ customer }: { customer: Customer }) {
 
 /** What the agent did before answering: each tool call and its result. */
 function Trace({ tools }: { tools: ToolStep[] }) {
+  const { t, fill } = useI18n()
   return (
     <details className="trace">
       <summary>
-        {tools.length} tool {tools.length === 1 ? 'call' : 'calls'}: {tools.map((t) => t.name).join(' → ')}
+        {fill(t.toolCalls, { count: tools.length })}
+        {tools.map((tool, i) => (
+          <code key={i}>{tool.name}</code>
+        ))}
       </summary>
       {tools.map((tool, i) => (
         <div key={i} className="tool">
           <div className="tool-name">
             {tool.name}
-            {tool.ok === false && <span className="badge bad">error</span>}
+            {tool.ok === false && <span className="badge bad">{t.toolError}</span>}
           </div>
           <pre>{JSON.stringify(tool.input, null, 2)}</pre>
           {tool.result !== undefined && <pre>{JSON.stringify(tool.result, null, 2)}</pre>}
@@ -146,14 +179,20 @@ function Trace({ tools }: { tools: ToolStep[] }) {
 }
 
 function Stats({ result }: { result: ChatResult }) {
+  const { t, fill, number } = useI18n()
   const { usage } = result
   const input = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
+  const parts = [
+    fill(t.statsCalls, { count: result.steps }),
+    fill(t.statsIn, { count: number(input) }) +
+      (usage.cacheReadTokens > 0 ? ` (${fill(t.statsCached, { count: number(usage.cacheReadTokens) })})` : ''),
+    fill(t.statsOut, { count: number(usage.outputTokens) }),
+    result.costUsd !== null ? `US$ ${result.costUsd.toFixed(4)}` : null,
+    `${(result.latencyMs / 1000).toFixed(1)}s`,
+  ].filter(Boolean)
   return (
     <div className="stats">
-      {result.steps} model {result.steps === 1 ? 'call' : 'calls'} · {input.toLocaleString()} tokens in
-      {usage.cacheReadTokens > 0 && ` (${usage.cacheReadTokens.toLocaleString()} cached)`} ·{' '}
-      {usage.outputTokens.toLocaleString()} out
-      {result.costUsd !== null && ` · $${result.costUsd.toFixed(4)}`} · {(result.latencyMs / 1000).toFixed(1)}s
+      {parts.join(' · ')}
       {result.stopReason !== 'completed' && <span className="badge bad">{result.stopReason}</span>}
     </div>
   )

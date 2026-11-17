@@ -16,13 +16,15 @@ import { estimateCostUsd, type Usage } from '../agent/usage.js';
 import { DB, type Database } from '../db/database.module.js';
 import { auditLog, conversations, customers, messages } from '../db/schema.js';
 import { Clock } from '../streambox/rules.js';
-import { buildSystemPrompt } from '../streambox/system-prompt.js';
+import { buildSystemPrompt, type Language } from '../streambox/system-prompt.js';
 import { StreamboxTools } from '../streambox/tools.js';
 
 export interface ChatInput {
   customerId: number;
   conversationId?: string;
   message: string;
+  /** The language the customer chose in the UI. Defaults to English. */
+  language?: Language;
 }
 
 export interface ChatResult {
@@ -37,11 +39,23 @@ export interface ChatResult {
 }
 
 /** What the customer sees when the agent could not finish normally. */
-const FALLBACK_REPLIES: Partial<Record<StopReason, string>> = {
-  max_steps:
-    "I wasn't able to finish this request. Please try again, or contact support@streambox.example.",
-  refusal: "I can't help with that request. I can help with your StreamBox account, billing and policies.",
-  truncated: 'My answer was cut short. Could you ask again, perhaps one question at a time?',
+type Fallbacks = Partial<Record<StopReason, string>>;
+const FALLBACK_REPLIES: Record<Language, Fallbacks> = {
+  en: {
+    max_steps: "I wasn't able to finish this request. Please try again, or contact support@streambox.example.",
+    refusal: "I can't help with that request. I can help with your StreamBox account, billing and policies.",
+    truncated: 'My answer was cut short. Could you ask again, perhaps one question at a time?',
+  },
+  pt: {
+    max_steps: 'Não consegui concluir este pedido. Tente de novo ou escreva para support@streambox.example.',
+    refusal: 'Não posso ajudar com esse pedido. Posso ajudar com a sua conta, cobranças e políticas da StreamBox.',
+    truncated: 'Minha resposta foi cortada. Pode perguntar de novo, talvez uma pergunta por vez?',
+  },
+  es: {
+    max_steps: 'No pude completar esta solicitud. Inténtalo de nuevo o escribe a support@streambox.example.',
+    refusal: 'No puedo ayudar con esa solicitud. Puedo ayudarte con tu cuenta, cobros y políticas de StreamBox.',
+    truncated: 'Mi respuesta se cortó. ¿Puedes preguntar de nuevo, quizá una pregunta a la vez?',
+  },
 };
 
 @Injectable()
@@ -66,7 +80,7 @@ export class ChatService {
 
     const run = await runAgent({
       model: this.model,
-      system: buildSystemPrompt(this.clock.now()),
+      system: buildSystemPrompt(this.clock.now(), input.language),
       tools: this.tools.all(),
       messages: [...history, userMessage],
       context,
@@ -87,7 +101,7 @@ export class ChatService {
     const newMessages = [userMessage, ...run.newMessages];
     const last = run.newMessages.at(-1);
     let reply = last?.role === 'assistant' ? textOf(last) : '';
-    const fallback = FALLBACK_REPLIES[run.stopReason];
+    const fallback = FALLBACK_REPLIES[input.language ?? 'en'][run.stopReason];
     if (fallback && (run.stopReason !== 'truncated' || !reply)) {
       reply = fallback;
       newMessages.push({ role: 'assistant', content: fallback });

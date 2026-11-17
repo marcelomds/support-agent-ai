@@ -4,15 +4,17 @@ import {
   Controller,
   Get,
   Inject,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
   Query,
 } from '@nestjs/common';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { DB, type Database } from '../db/database.module.js';
 import { auditLog, customers } from '../db/schema.js';
+import { AccountService } from '../streambox/account.service.js';
 import { RefundService } from '../streambox/refund.service.js';
 
 const RefundStatus = z.enum(['pending_approval', 'refunded', 'rejected']).optional();
@@ -30,11 +32,24 @@ export class AdminController {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly refunds: RefundService,
+    private readonly account: AccountService,
   ) {}
 
   @Get('customers')
   listCustomers() {
     return this.db.select().from(customers).orderBy(customers.id);
+  }
+
+  /** What the demo UI shows next to the chat: the same data the agent's read tools return. */
+  @Get('customers/:id/account')
+  async getAccount(@Param('id', ParseIntPipe) id: number) {
+    const [customer] = await this.db.select().from(customers).where(eq(customers.id, id));
+    if (!customer) throw new NotFoundException('Customer not found.');
+    return {
+      customer,
+      subscription: await this.account.getSubscriptionSummary(id),
+      payments: await this.account.listPayments(id, 5),
+    };
   }
 
   @Get('refunds')

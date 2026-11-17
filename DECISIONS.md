@@ -133,3 +133,25 @@ data on every test run.
 **Decision:** One CSS file, no Tailwind.
 **Why:** The UI is three small screens. A CSS framework would add a build
 dependency without teaching anything about the agent.
+
+## 018 — Three languages, chosen by the user
+**Decision:** The UI is available in English, Portuguese and Spanish, with a
+language picker. The chosen language is sent with each chat request and the
+system prompt tells the agent to answer in it.
+**Alternative:** Let the agent answer in whatever language the customer
+writes. Rejected because the user asked for an explicit choice, and an
+explicit choice is easier to test: one assertion on the system prompt.
+**How:** A typed dictionary per language in `apps/web/src/i18n.tsx`, without
+an i18n library. TypeScript fails the build if a language is missing a key.
+Dates, numbers and money use the browser's `Intl` formatters.
+**Limitations:** Policy documents exist only in English, so the agent
+translates what it reports, and `search_policies` is told to search with
+English keywords. Data stored in the database (plan names, refund reasons) is
+not translated. Prices stay in US dollars in every language.
+
+## 019 — Product-style layout for the demo UI
+**Decision:** A sidebar shell with three pages, and an account panel next to
+the chat showing the customer's plan and recent payments.
+**Why:** The panel reads the same data the agent's tools return, so a viewer
+can check the agent's answers against the account, and see the account change
+after an action such as a refund.

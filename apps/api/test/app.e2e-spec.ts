@@ -71,6 +71,39 @@ describe('API (e2e)', () => {
       .expect(404);
   });
 
+  it('tells the model to answer in the language the customer chose', async () => {
+    await boot([fakeMessage([text('Olá!')]), fakeMessage([text('Hello!')])]);
+    await request(app.getHttpServer())
+      .post('/chat').send({ customerId: CUSTOMER.alice, message: 'Oi', language: 'pt' }).expect(201);
+    await request(app.getHttpServer())
+      .post('/chat').send({ customerId: CUSTOMER.alice, message: 'Hi' }).expect(201);
+
+    expect(model.requests[0].system).toContain('write every reply in Brazilian Portuguese');
+    expect(model.requests[1].system).toContain('write every reply in English');
+    await request(app.getHttpServer())
+      .post('/chat').send({ customerId: CUSTOMER.alice, message: 'Salut', language: 'fr' }).expect(400);
+  });
+
+  it('uses the chosen language for the fallback reply', async () => {
+    await boot(Array.from({ length: 8 }, () => fakeMessage([toolUse('list_plans')])));
+    const { body } = await request(app.getHttpServer())
+      .post('/chat').send({ customerId: CUSTOMER.alice, message: 'Bucle', language: 'es' }).expect(201);
+
+    expect(body.reply).toContain('No pude completar');
+  });
+
+  it('GET /customers/:id/account returns the subscription and recent payments', async () => {
+    await boot([]);
+    const { body } = await request(app.getHttpServer()).get(`/customers/${CUSTOMER.alice}/account`).expect(200);
+
+    expect(body).toMatchObject({
+      customer: { name: 'Alice Martin' },
+      subscription: { status: 'active', plan: { code: 'standard_monthly' } },
+    });
+    expect(body.payments).toHaveLength(2);
+    await request(app.getHttpServer()).get('/customers/999/account').expect(404);
+  });
+
   it('rejects an invalid body', async () => {
     await boot([]);
     await request(app.getHttpServer()).post('/chat').send({ customerId: 'x', message: '' }).expect(400);

@@ -18,6 +18,7 @@ const ChatBody = z.object({
   customerId: z.number().int().positive(),
   conversationId: z.uuid().optional(),
   message: z.string().trim().min(1).max(4000),
+  language: z.enum(['en', 'pt', 'es']).optional(),
 });
 
 @Controller('chat')

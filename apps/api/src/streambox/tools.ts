@@ -73,7 +73,8 @@ export class StreamboxTools {
         description:
           'Searches the official StreamBox policies (cancellation, refunds, plan changes, ' +
           'billing) and returns the most relevant sections. Use it for any question about ' +
-          'rules or how things work, and base the answer only on what it returns.',
+          'rules or how things work, and base the answer only on what it returns. ' +
+          'The policies are written in English, so search with English keywords.',
         schema: z.object({
           query: z.string().min(2).describe('Keywords, e.g. "refund after 7 days duplicate charge".'),
         }),

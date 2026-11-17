@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react'
-import { listCustomers, type Customer } from './api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AccountPanel } from './AccountPanel'
+import { getAccount, listCustomers, type Account, type Customer } from './api'
 import { Approvals } from './Approvals'
 import { Audit } from './Audit'
 import { Chat } from './Chat'
+import { LANGUAGES, useI18n, type Language } from './i18n'
+import { ApprovalIcon, AuditIcon, ChatIcon, GlobeIcon, Logo } from './icons'
 
-type Tab = 'chat' | 'approvals' | 'audit'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'chat', label: 'Customer chat' },
-  { id: 'approvals', label: 'Refund approvals' },
-  { id: 'audit', label: 'Audit log' },
-]
+type Page = 'chat' | 'approvals' | 'audit'
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('chat')
+  const { t, language, setLanguage } = useI18n()
+  const [page, setPage] = useState<Page>('chat')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerId, setCustomerId] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [account, setAccount] = useState<Account | null>(null)
+  const [apiDown, setApiDown] = useState(false)
 
   useEffect(() => {
     listCustomers()
@@ -23,41 +23,93 @@ export default function App() {
         setCustomers(list)
         setCustomerId(list[0]?.id ?? null)
       })
-      .catch(() => setError('Could not reach the API. Is it running on port 3000?'))
+      .catch(() => setApiDown(true))
   }, [])
 
+  const loadAccount = useCallback(() => {
+    if (customerId === null) return
+    getAccount(customerId)
+      .then(setAccount)
+      .catch(() => setAccount(null))
+  }, [customerId])
+  useEffect(loadAccount, [loadAccount])
+
+  const selectCustomer = (id: number) => {
+    setAccount(null)
+    setCustomerId(id)
+  }
+
   const customer = customers.find((c) => c.id === customerId)
+  const customerNames = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers])
+
+  const pages = [
+    { id: 'chat', label: t.navChat, icon: <ChatIcon />, title: t.chatTitle, subtitle: t.chatSubtitle },
+    { id: 'approvals', label: t.navApprovals, icon: <ApprovalIcon />, title: t.approvalsTitle, subtitle: t.approvalsSubtitle },
+    { id: 'audit', label: t.navAudit, icon: <AuditIcon />, title: t.auditTitle, subtitle: t.auditSubtitle },
+  ] as const
+  const current = pages.find((p) => p.id === page)!
 
   return (
-    <div className="app">
-      <header>
-        <h1>StreamBox Support Agent</h1>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="avatar logo">
+            <Logo />
+          </div>
+          <div>
+            <strong>StreamBox</strong>
+            <span>{t.brandTagline}</span>
+          </div>
+        </div>
+
         <nav>
-          {TABS.map(({ id, label }) => (
-            <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-              {label}
+          {pages.map(({ id, label, icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={page === id ? 'active' : ''}
+              aria-current={page === id ? 'page' : undefined}
+              onClick={() => setPage(id)}
+            >
+              {icon}
+              <span>{label}</span>
             </button>
           ))}
         </nav>
-        {tab === 'chat' && customers.length > 0 && (
-          <label className="picker">
-            Signed in as
-            <select value={customerId ?? ''} onChange={(e) => setCustomerId(Number(e.target.value))}>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+
+        <div className="sidebar-foot">
+          <label className="language">
+            <GlobeIcon />
+            <span className="sr-only">{t.language}</span>
+            <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} aria-label={t.language}>
+              {LANGUAGES.map(({ code, label }) => (
+                <option key={code} value={code}>
+                  {label}
                 </option>
               ))}
             </select>
           </label>
-        )}
-      </header>
+          <p>{t.demoNote}</p>
+        </div>
+      </aside>
+
       <main>
-        {error && <p className="notice error">{error}</p>}
-        {/* The key resets the chat when the customer changes: a new conversation. */}
-        {tab === 'chat' && customer && <Chat key={customer.id} customer={customer} />}
-        {tab === 'approvals' && <Approvals />}
-        {tab === 'audit' && <Audit />}
+        <div className="page-head">
+          <h1>{current.title}</h1>
+          <p>{current.subtitle}</p>
+        </div>
+
+        {apiDown && <p className="notice error">{t.apiDown}</p>}
+
+        {page === 'chat' && customer && (
+          <div className="chat-layout">
+            {/* The key resets the chat when the customer or the language changes. */}
+            <Chat key={`${customer.id}-${language}`} customer={customer} onAnswered={loadAccount} />
+            <AccountPanel customers={customers} customerId={customer.id} onSelect={selectCustomer} account={account} />
+          </div>
+        )}
+        {page === 'approvals' && <Approvals />}
+        {page === 'audit' && <Audit customerNames={customerNames} />}
       </main>
     </div>
   )

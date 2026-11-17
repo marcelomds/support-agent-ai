@@ -22,12 +22,32 @@ export interface ChatResult {
   latencyMs: number
 }
 
+export interface Account {
+  customer: Customer
+  subscription:
+    | { has_subscription: false }
+    | {
+        has_subscription: true
+        status: 'active' | 'past_due' | 'suspended' | 'canceled'
+        plan: { code: string; name: string; price_cents: number }
+        current_period_end: string
+        cancel_at_period_end: boolean
+        pending_downgrade_to: string | null
+      }
+  payments: {
+    payment_id: number
+    amount_cents: number
+    status: 'succeeded' | 'failed' | 'refunded'
+    charged_at: string
+  }[]
+}
+
 export interface Refund {
   id: number
   status: 'pending_approval' | 'refunded' | 'rejected'
   amountCents: number
   reason: string
-  rule: string
+  rule: 'within_window' | 'duplicate_charge'
   customerName: string
   customerEmail: string
   decidedBy: string | null
@@ -64,7 +84,8 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const listCustomers = () => json<Customer[]>('/customers')
-export const listRefunds = () => json<Refund[]>('/refunds')
+export const getAccount = (customerId: number) => json<Account>(`/customers/${customerId}/account`)
+export const listRefunds =() => json<Refund[]>('/refunds')
 export const listAudit = () => json<AuditEntry[]>('/audit')
 export const decideRefund = (id: number, decision: 'approve' | 'reject', decidedBy: string) =>
   json<Refund>(`/refunds/${id}/decision`, {
@@ -77,7 +98,7 @@ export const decideRefund = (id: number, decision: 'approve' | 'reject', decided
  * EventSource only supports GET, so the stream is read from fetch directly.
  */
 export async function streamChat(
-  body: { customerId: number; conversationId?: string; message: string },
+  body: { customerId: number; conversationId?: string; message: string; language: string },
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
   const response = await fetch('/api/chat/stream', {
@@ -106,5 +127,3 @@ export async function streamChat(
     }
   }
 }
-
-export const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`

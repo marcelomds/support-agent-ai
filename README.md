@@ -21,13 +21,14 @@ hand on top of the model SDK, so every step is visible.
 | 2 | Read tools and a hand-written agent loop | Tool use, agent loop, prompt caching | ✅ built |
 | 3 | Policy documents, queued ingestion and retrieval | Embeddings, hybrid search (keyword + meaning), queues | ✅ built |
 | 4 | Action tools with business rules and human approval | Guardrails, human in the loop, audit trail | ✅ built |
-| 5 | Evals with the real model, accuracy as a number | Evals, end-state grading, LLM-as-judge | 🚧 built, first run pending |
+| 5 | Evals with the real model, accuracy as a number | Evals, end-state grading, LLM-as-judge | ✅ built; [first results](apps/api/evals/results/2026-11-17-first-run.md) |
 | 6 | MCP server and skills | MCP, skills | ⏳ |
 | 7 | Observability, prompt injection defense | Tracing, model routing | ⏳ |
 
-> **Not yet verified against the real model.** The agent loop, the tools, the
-> business rules and the API are covered by automated tests that use a scripted
-> model. Running it with a real API key is the next step.
+> **Measured with the real model.** 17 eval conversations, graded by what ended
+> up in the database and by an LLM judge. It is a small set, run once, so it
+> shows that nothing is broken rather than proving quality; see the
+> [results and their limits](apps/api/evals/results/2026-11-17-first-run.md).
 
 ## How it works
 
@@ -110,7 +111,7 @@ statements about the reply that a second model marks true or false.
 pnpm --filter api evals
 ```
 
-This calls the Anthropic API (about $1 per full run) and writes
+This calls the Anthropic API (about $0.36 per full run, measured) and writes
 `apps/api/evals/results/latest.md`. Cases live in
 [`apps/api/evals/cases.ts`](apps/api/evals/cases.ts).
 

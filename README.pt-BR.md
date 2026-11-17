@@ -21,13 +21,14 @@ mão sobre o SDK do modelo, para que cada passo fique visível.
 | 2 | Ferramentas de leitura e loop do agente feito na mão | Tool use, loop de agente, prompt caching | ✅ feito |
 | 3 | Documentos de política, ingestão com fila e busca | Embeddings, busca híbrida (palavra-chave + significado), filas | ✅ feito |
 | 4 | Ferramentas de ação com regras de negócio e aprovação humana | Guardrails, humano no circuito, auditoria | ✅ feito |
-| 5 | Evals com o modelo real, com o acerto medido em número | Evals, correção pelo estado final, LLM-as-judge | 🚧 feito, falta a primeira rodada |
+| 5 | Evals com o modelo real, com o acerto medido em número | Evals, correção pelo estado final, LLM-as-judge | ✅ feito; [primeiros resultados](apps/api/evals/results/2026-11-17-first-run.md) |
 | 6 | Servidor MCP e skills | MCP, skills | ⏳ |
 | 7 | Observabilidade, defesa contra prompt injection | Tracing, roteamento de modelos | ⏳ |
 
-> **Ainda não validado com o modelo real.** O loop do agente, as ferramentas,
-> as regras de negócio e a API estão cobertos por testes automatizados que usam
-> um modelo simulado. Rodar com uma chave real da API é o próximo passo.
+> **Medido com o modelo real.** São 17 conversas de eval, corrigidas pelo que
+> ficou no banco e por um modelo-juiz. É um conjunto pequeno, rodado uma vez:
+> mostra que nada está quebrado, mas não prova qualidade. Veja os
+> [resultados e os limites deles](apps/api/evals/results/2026-11-17-first-run.md).
 
 ## Como funciona
 
@@ -112,7 +113,7 @@ ou falsas.
 pnpm --filter api evals
 ```
 
-Isso chama a API da Anthropic (cerca de US$ 1 por rodada completa) e grava
+Isso chama a API da Anthropic (cerca de US$ 0,36 por rodada completa, valor medido) e grava
 `apps/api/evals/results/latest.md`. Os casos ficam em
 [`apps/api/evals/cases.ts`](apps/api/evals/cases.ts).
 

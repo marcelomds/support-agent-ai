@@ -127,6 +127,45 @@ describe('runAgent', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('holds a write tool back when the gate returns a value, and lets read tools through', async () => {
+    const ran: string[] = [];
+    const tool = (name: string, kind: 'read' | 'write') =>
+      defineTool({
+        name, kind, description: name, schema: z.object({}),
+        execute: async () => { ran.push(name); return { done: name }; },
+      });
+    const model = new ScriptedModel([
+      fakeMessage([toolUse('look', {}, 'toolu_a'), toolUse('change', {}, 'toolu_b')]),
+      fakeMessage([text('Please confirm.')]),
+    ]);
+    const executions: { name: string; deferred?: boolean }[] = [];
+    await runAgent({
+      model, system: 's', tools: [tool('look', 'read'), tool('change', 'write')], messages: question, context,
+      interceptWrite: async () => ({ status: 'awaiting_confirmation' }),
+      onToolExecuted: (e) => void executions.push({ name: e.name, deferred: e.deferred }),
+    });
+
+    expect(ran).toEqual(['look']);
+    expect(executions).toEqual([{ name: 'look', deferred: undefined }, { name: 'change', deferred: true }]);
+    const results = model.requests[1].messages.at(-1)!.content as { content: string }[];
+    expect(results[1].content).toContain('awaiting_confirmation');
+  });
+
+  it('runs a write tool when the gate lets it through', async () => {
+    const ran: string[] = [];
+    const change = defineTool({
+      name: 'change', kind: 'write', description: 'c', schema: z.object({}),
+      execute: async () => { ran.push('change'); return {}; },
+    });
+    const model = new ScriptedModel([fakeMessage([toolUse('change')]), fakeMessage([text('Done.')])]);
+    await runAgent({
+      model, system: 's', tools: [change], messages: question, context,
+      interceptWrite: async () => undefined,
+    });
+
+    expect(ran).toEqual(['change']);
+  });
+
   it('describes each tool to the model with a JSON schema', async () => {
     const model = new ScriptedModel([fakeMessage([text('hi')])]);
     await runAgent({ model, system: 's', tools: [paymentsTool()], messages: question, context });

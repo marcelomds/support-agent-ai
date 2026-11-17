@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { ToolError } from '../agent/tool.js';
-import { DB, type Database } from '../db/database.module.js';
+import { DB, type Database, type Executor } from '../db/database.module.js';
 import { payments, plans, subscriptions } from '../db/schema.js';
 import {
   Clock,
@@ -19,8 +19,8 @@ export class AccountService {
   ) {}
 
   /** The customer's most recent subscription, or undefined if they never had one. */
-  async findSubscription(customerId: number) {
-    const [subscription] = await this.db
+  async findSubscription(customerId: number, db: Executor = this.db) {
+    const [subscription] = await db
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.customerId, customerId))
@@ -29,8 +29,8 @@ export class AccountService {
     return subscription;
   }
 
-  async requireSubscription(customerId: number) {
-    const subscription = await this.findSubscription(customerId);
+  async requireSubscription(customerId: number, db: Executor = this.db) {
+    const subscription = await this.findSubscription(customerId, db);
     if (!subscription) {
       throw new ToolError('This customer has no subscription.');
     }

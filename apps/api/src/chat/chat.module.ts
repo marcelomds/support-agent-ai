@@ -4,12 +4,14 @@ import { AnthropicModelClient, MODEL_CLIENT } from '../agent/model-client.js';
 import { StreamboxModule } from '../streambox/streambox.module.js';
 import { ChatController } from './chat.controller.js';
 import { ChatService } from './chat.service.js';
+import { PendingActionsService } from './pending-actions.service.js';
 
 @Module({
   imports: [StreamboxModule],
   controllers: [ChatController],
   providers: [
     ChatService,
+    PendingActionsService,
     {
       provide: MODEL_CLIENT,
       inject: [ConfigService],
@@ -22,5 +24,6 @@ import { ChatService } from './chat.service.js';
         }),
     },
   ],
+  exports: [ChatService, PendingActionsService],
 })
 export class ChatModule {}

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { ToolError } from '../agent/tool.js';
-import { DB, type Database } from '../db/database.module.js';
+import { DB, type Database, type Executor } from '../db/database.module.js';
 import { auditLog, customers, payments, refunds, subscriptions } from '../db/schema.js';
 import { isDuplicate } from './account.service.js';
 import {
@@ -33,8 +33,9 @@ export class RefundService {
     customerId: number,
     paymentId: number,
     reason: string,
+    db: Executor = this.db,
   ): Promise<RefundOutcome> {
-    return this.db.transaction(async (tx) => {
+    return db.transaction(async (tx) => {
       // The payment must belong to the customer in the session.
       const [row] = await tx
         .select({ payment: payments })

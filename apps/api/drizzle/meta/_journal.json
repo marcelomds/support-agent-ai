@@ -22,6 +22,13 @@
       "when": 1794932937313,
       "tag": "0002_policy_embeddings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794935568861,
+      "tag": "0003_confirmations_and_runs",
+      "breakpoints": true
     }
   ]
 }

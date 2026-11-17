@@ -5,9 +5,10 @@
  * from `ctx`, which the application fills from the session. The model cannot
  * ask for another customer's data because there is no parameter to ask with.
  */
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { defineTool, type AgentTool } from '../agent/tool.js';
+import { defineTool, type ActionPreview, type AgentTool } from '../agent/tool.js';
+import { DB, dryRun, type Database, type Transaction } from '../db/database.module.js';
 import { AccountService } from './account.service.js';
 import { PolicyService } from './policy.service.js';
 import { RefundService } from './refund.service.js';
@@ -16,11 +17,27 @@ import { SubscriptionService } from './subscription.service.js';
 @Injectable()
 export class StreamboxTools {
   constructor(
+    @Inject(DB) private readonly db: Database,
     private readonly account: AccountService,
     private readonly policies: PolicyService,
     private readonly refunds: RefundService,
     private readonly subscriptions: SubscriptionService,
   ) {}
+
+  /**
+   * Previews an action by running the real service inside a transaction that
+   * is rolled back. The preview cannot drift from the real behaviour, because
+   * it is the real behaviour.
+   */
+  private async preview<T extends { outcome: string }>(
+    action: (tx: Transaction) => Promise<T>,
+    nothingToConfirm: string[] = [],
+  ): Promise<ActionPreview> {
+    const outcome = await dryRun(this.db, action);
+    return nothingToConfirm.includes(outcome.outcome)
+      ? { confirm: false, result: outcome }
+      : { confirm: true, details: outcome };
+  }
 
   all(): AgentTool[] {
     return [
@@ -91,11 +108,13 @@ export class StreamboxTools {
         description:
           "Changes the customer's plan. Upgrades apply immediately and may charge the customer now; " +
           'downgrades are scheduled for the next billing period. ' +
-          'Only call this after the customer has explicitly confirmed the specific plan.',
+          'Calling it does not change the plan yet: it shows the customer a confirmation button with the exact change.',
         schema: z.object({
           plan_code: z.string().describe('Target plan code from list_plans, e.g. "premium_monthly".'),
         }),
         execute: ({ plan_code }, ctx) => this.subscriptions.changePlan(ctx.customerId, plan_code),
+        preview: ({ plan_code }, ctx) =>
+          this.preview((tx) => this.subscriptions.changePlan(ctx.customerId, plan_code, tx)),
       }),
 
       defineTool({
@@ -103,9 +122,11 @@ export class StreamboxTools {
         kind: 'write',
         description:
           "Cancels the customer's subscription. Access continues until the end of the paid period. " +
-          'Only call this after the customer has explicitly confirmed they want to cancel.',
+          'Calling it does not cancel yet: it shows the customer a confirmation button.',
         schema: z.object({}),
         execute: (_input, ctx) => this.subscriptions.cancel(ctx.customerId),
+        preview: (_input, ctx) =>
+          this.preview((tx) => this.subscriptions.cancel(ctx.customerId, tx), ['already_scheduled']),
       }),
 
       defineTool({
@@ -114,14 +135,25 @@ export class StreamboxTools {
         description:
           'Requests a refund for one charge. The system applies the refund policy and returns one of: ' +
           '"refunded" (done), "pending_approval" (a human will review it), or "denied" (with the reason). ' +
-          'The outcome is final: report it as returned and never promise a different result. ' +
-          'Only call this after the customer has confirmed which charge they want refunded.',
+          'A request that would be denied is answered at once. Otherwise calling it does not move money yet: ' +
+          'it shows the customer a confirmation button with what will happen. ' +
+          'The outcome is final: report it as returned and never promise a different result.',
         schema: z.object({
           payment_id: z.number().int().describe('The payment_id from list_payments.'),
           reason: z.string().min(3).describe("The customer's reason, in a short sentence."),
         }),
         execute: ({ payment_id, reason }, ctx) =>
           this.refunds.request(ctx.customerId, payment_id, reason),
+        // A request that would be denied changes nothing, so there is nothing to confirm.
+        preview: async ({ payment_id, reason }, ctx) => {
+          const preview = await this.preview(
+            (tx) => this.refunds.request(ctx.customerId, payment_id, reason, tx),
+            ['denied'],
+          );
+          // The refund id from a dry run was never stored; do not show it.
+          if (preview.confirm) delete preview.details.refund_id;
+          return preview;
+        },
       }),
     ];
   }

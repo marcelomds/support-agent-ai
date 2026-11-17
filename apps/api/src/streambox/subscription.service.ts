@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { ToolError } from '../agent/tool.js';
-import { DB, type Database } from '../db/database.module.js';
+import { DB, type Database, type Executor } from '../db/database.module.js';
 import { payments, subscriptions } from '../db/schema.js';
 import { AccountService } from './account.service.js';
 import { Clock, DAY_MS, PERIOD_DAYS, TIER_RANK } from './rules.js';
@@ -15,8 +15,8 @@ export class SubscriptionService {
     private readonly clock: Clock,
   ) {}
 
-  async changePlan(customerId: number, planCode: string) {
-    const subscription = await this.account.requireSubscription(customerId);
+  async changePlan(customerId: number, planCode: string, db: Executor = this.db) {
+    const subscription = await this.account.requireSubscription(customerId, db);
     if (subscription.status !== 'active') {
       throw new ToolError(`Plan changes need an active subscription. Status: ${subscription.status}.`);
     }
@@ -39,7 +39,7 @@ export class SubscriptionService {
 
     if (!isUpgrade) {
       // Downgrade: the customer keeps what they paid for until the cycle ends.
-      await this.db
+      await db
         .update(subscriptions)
         .set({ pendingPlanId: target.id })
         .where(eq(subscriptions.id, subscription.id));
@@ -60,7 +60,7 @@ export class SubscriptionService {
       ? Math.round((target.priceCents - current.priceCents) * remaining)
       : target.priceCents;
 
-    return this.db.transaction(async (tx) => {
+    return db.transaction(async (tx) => {
       await tx
         .update(subscriptions)
         .set({
@@ -92,8 +92,8 @@ export class SubscriptionService {
     });
   }
 
-  async cancel(customerId: number) {
-    const subscription = await this.account.requireSubscription(customerId);
+  async cancel(customerId: number, db: Executor = this.db) {
+    const subscription = await this.account.requireSubscription(customerId, db);
     if (subscription.status === 'canceled') {
       throw new ToolError('This subscription is already canceled.');
     }
@@ -107,14 +107,14 @@ export class SubscriptionService {
 
     // A suspended subscription has no paid period left: it ends immediately.
     if (subscription.status === 'suspended') {
-      await this.db
+      await db
         .update(subscriptions)
         .set({ status: 'canceled', canceledAt: now })
         .where(eq(subscriptions.id, subscription.id));
       return { outcome: 'canceled_now' as const };
     }
 
-    await this.db
+    await db
       .update(subscriptions)
       .set({ cancelAtPeriodEnd: true, canceledAt: now, pendingPlanId: null })
       .where(eq(subscriptions.id, subscription.id));

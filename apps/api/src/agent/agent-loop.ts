@@ -43,7 +43,21 @@ export interface AgentRunInput {
   onEvent?: (event: AgentEvent) => void;
   /** Called after every tool execution. Used for the audit trail. */
   onToolExecuted?: (record: ToolExecution) => Promise<void> | void;
+  /**
+   * A gate in front of write tools. When it returns anything other than
+   * `undefined`, the tool does not run and that value is sent to the model as
+   * the result. This is how an
+   * action waits for confirmation: no wording in the conversation can make a
+   * write tool execute from inside the loop.
+   */
+  interceptWrite?: WriteInterceptor;
 }
+
+export type WriteInterceptor = (
+  tool: AgentTool,
+  input: unknown,
+  context: ToolContext,
+) => Promise<unknown>;
 
 export interface ToolExecution {
   tool: AgentTool | undefined;
@@ -51,6 +65,8 @@ export interface ToolExecution {
   input: unknown;
   ok: boolean;
   result: unknown;
+  /** True when a write tool was held back by `interceptWrite` and did not run. */
+  deferred?: boolean;
 }
 
 export interface AgentRunResult {
@@ -112,7 +128,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     const results: ToolResultBlock[] = [];
     for (const call of toolCalls) {
       input.onEvent?.({ type: 'tool_call', name: call.name, input: call.input });
-      const execution = await executeTool(toolsByName, call, input.context);
+      const execution = await executeTool(toolsByName, call, input.context, input.interceptWrite);
       await input.onToolExecuted?.(execution);
       input.onEvent?.({
         type: 'tool_result',
@@ -137,6 +153,7 @@ async function executeTool(
   toolsByName: Map<string, AgentTool>,
   call: ToolUseBlock,
   context: ToolContext,
+  interceptWrite?: WriteInterceptor,
 ): Promise<ToolExecution> {
   const tool = toolsByName.get(call.name);
   const base = { tool, name: call.name, input: call.input };
@@ -155,6 +172,12 @@ async function executeTool(
   }
 
   try {
+    if (tool.kind === 'write' && interceptWrite) {
+      const held = await interceptWrite(tool, parsed.data, context);
+      if (held !== undefined) {
+        return { ...base, input: parsed.data, ok: true, result: held, deferred: true };
+      }
+    }
     const result = await tool.execute(parsed.data, context);
     return { ...base, input: parsed.data, ok: true, result };
   } catch (error) {

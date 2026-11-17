@@ -163,7 +163,7 @@ export const messages = pgTable(
     conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id),
-    role: text().notNull(), // 'user' | 'assistant'
+    role: text().notNull(), // 'user' | 'assistant' | 'system' (a trusted note from the application)
     /** Exactly what is sent to the model: text, tool calls and tool results. */
     content: jsonb().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -171,6 +171,72 @@ export const messages = pgTable(
       .defaultNow(),
   },
   (t) => [index('messages_conversation_id_idx').on(t.conversationId)],
+);
+
+export const pendingActionStatus = pgEnum('pending_action_status', [
+  'pending', // waiting for the customer to press Confirm or Cancel
+  'confirmed', // the customer confirmed and the action ran
+  'declined', // the customer cancelled it
+  'superseded', // replaced by a newer proposal in the same conversation
+  'expired', // not answered in time
+]);
+
+/**
+ * An action the agent proposed and the customer has not confirmed yet.
+ * Write tools never run from inside the conversation: they create a row here,
+ * and only the customer's button press executes it.
+ */
+export const pendingActions = pgTable(
+  'pending_actions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    customerId: integer('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => conversations.id),
+    tool: text().notNull(),
+    input: jsonb().notNull(),
+    /** What will happen, computed by a dry run of the real code. Shown to the customer. */
+    preview: jsonb().notNull(),
+    status: pendingActionStatus().notNull().default('pending'),
+    result: jsonb(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('pending_actions_conversation_id_idx').on(t.conversationId)],
+);
+
+/**
+ * One row per answer the agent produced: what it cost and how it went.
+ * This is the data behind the metrics page.
+ */
+export const agentRuns = pgTable(
+  'agent_runs',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity(),
+    customerId: integer('customer_id').notNull(),
+    conversationId: uuid('conversation_id').notNull(),
+    model: text().notNull(),
+    stopReason: text('stop_reason').notNull(),
+    modelCalls: integer('model_calls').notNull(),
+    toolCalls: integer('tool_calls').notNull(),
+    toolErrors: integer('tool_errors').notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    cachedTokens: integer('cached_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    /** Estimated cost in millionths of a dollar; null when the model has no known price. */
+    costMicroUsd: integer('cost_micro_usd'),
+    latencyMs: integer('latency_ms').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('agent_runs_created_at_idx').on(t.createdAt)],
 );
 
 /** Every tool call the agent makes and every human decision. Append-only. */

@@ -22,7 +22,18 @@ export interface AgentTool<Schema extends z.ZodType = z.ZodType> {
   /** What the model is allowed to send. Validated before `execute` runs. */
   schema: Schema;
   execute(input: z.infer<Schema>, ctx: ToolContext): Promise<unknown>;
+  /**
+   * For write tools: works out what `execute` would do, without doing it.
+   * Used to show the customer exactly what they are confirming.
+   */
+  preview?(input: z.infer<Schema>, ctx: ToolContext): Promise<ActionPreview>;
 }
+
+export type ActionPreview =
+  /** Something would change: show `details` and wait for the customer's confirmation. */
+  | { confirm: true; details: Record<string, unknown> }
+  /** Nothing would change (for example, the request would be denied): just report `result`. */
+  | { confirm: false; result: unknown };
 
 /** Helper that keeps the input type inferred from the schema. */
 export function defineTool<Schema extends z.ZodType>(

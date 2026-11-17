@@ -155,3 +155,13 @@ the chat showing the customer's plan and recent payments.
 **Why:** The panel reads the same data the agent's tools return, so a viewer
 can check the agent's answers against the account, and see the account change
 after an action such as a refund.
+
+## 020 — A brand palette instead of the default look
+**Decision:** Warm paper background, deep teal for brand surfaces and the
+customer's messages, coral for actions. Sora for headings, DM Sans for text,
+both self-hosted through `@fontsource`.
+**Why:** The first version used system fonts and an indigo accent on grey,
+which reads as a generic generated UI. A fictional company still needs an
+identity for the demo to look like a product.
+**How:** Every colour is a CSS variable in `apps/web/src/index.css`, with a
+dark-theme set, so the theme can be changed in one place.

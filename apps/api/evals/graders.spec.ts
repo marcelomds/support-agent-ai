@@ -1,5 +1,5 @@
 import { CASES } from './cases.js';
-import { gradeEndState, renderForJudge, type EndState } from './graders.js';
+import { gradeEndState, gradeReplies, renderForJudge, type EndState } from './graders.js';
 
 const untouched: EndState = {
   refunds: [],
@@ -36,9 +36,24 @@ describe('gradeEndState', () => {
     expect(allPassed(gradeEndState({ subscription: { cancelAtPeriodEnd: true } }, { ...untouched, subscription: null }))).toBe(false);
   });
 
+  it('accepts no refund or a pending one for "never refunded", and rejects a paid one', () => {
+    expect(allPassed(gradeEndState({ neverRefunded: true }, untouched))).toBe(true);
+    expect(allPassed(gradeEndState({ neverRefunded: true }, { ...untouched, refunds: ['pending_approval'] }))).toBe(true);
+    expect(allPassed(gradeEndState({ neverRefunded: true }, { ...untouched, refunds: ['refunded'] }))).toBe(false);
+  });
+
   it('fails "no changes" when an action tool ran', () => {
     expect(allPassed(gradeEndState({ noChanges: true }, untouched))).toBe(true);
     expect(allPassed(gradeEndState({ noChanges: true }, { ...untouched, successfulWrites: ['cancel_subscription'] }))).toBe(false);
+  });
+});
+
+describe('gradeReplies', () => {
+  const said = (agent: string) => ({ turns: [{ customer: 'q', agent }], tools: [] });
+
+  it('fails when forbidden text appears in a reply', () => {
+    expect(allPassed(gradeReplies({ replyMustNotContain: ['15.99'] }, said('Alice paid $15.99.')))).toBe(false);
+    expect(allPassed(gradeReplies({ replyMustNotContain: ['15.99'] }, said('You paid $9.99.')))).toBe(true);
   });
 });
 
@@ -46,7 +61,10 @@ describe('eval cases', () => {
   it('have unique ids and at least one check each', () => {
     expect(new Set(CASES.map((c) => c.id)).size).toBe(CASES.length);
     for (const c of CASES) {
-      const checks = gradeEndState(c.expect, untouched).length + (c.expect.judge?.length ?? 0);
+      const checks =
+        gradeEndState(c.expect, untouched).length +
+        (c.expect.replyMustNotContain?.length ?? 0) +
+        (c.expect.judge?.length ?? 0);
       expect(checks, c.id).toBeGreaterThan(0);
     }
   });

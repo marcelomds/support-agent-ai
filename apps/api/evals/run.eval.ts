@@ -23,7 +23,7 @@ import { PolicyIngestion } from '../src/streambox/policy-ingestion.js';
 import { StreamboxTools } from '../src/streambox/tools.js';
 import { CUSTOMER, createTestApp } from '../test/setup.js';
 import { CASES, type EvalCase } from './cases.js';
-import { Judge, gradeEndState, type CheckResult, type EndState, type Transcript } from './graders.js';
+import { Judge, gradeEndState, gradeReplies, type CheckResult, type EndState, type Transcript } from './graders.js';
 
 const REPS = Number(process.env.EVAL_REPS ?? 1);
 const ONLY = process.env.EVAL_ONLY?.split(',').map((id) => id.trim());
@@ -96,7 +96,7 @@ describe('agent evals', () => {
           await reseed();
           const transcript = await converse(evalCase, row);
           const endState = await readEndState(CUSTOMER[evalCase.customer], transcript);
-          const checks = gradeEndState(evalCase.expect, endState);
+          const checks = [...gradeEndState(evalCase.expect, endState), ...gradeReplies(evalCase.expect, transcript)];
           for (const statement of evalCase.expect.judge ?? []) {
             checks.push(await judge.grade(statement, transcript));
           }

@@ -30,6 +30,14 @@ export interface CheckResult {
 export function gradeEndState(expect: Expectation, state: EndState): CheckResult[] {
   const results: CheckResult[] = [];
 
+  if (expect.neverRefunded) {
+    results.push({
+      check: 'no money was refunded',
+      passed: !state.refunds.includes('refunded'),
+      detail: `refunds created: ${state.refunds.length ? state.refunds.join(', ') : 'none'}`,
+    });
+  }
+
   if (expect.refund !== undefined) {
     const expected = expect.refund === 'none' ? [] : [expect.refund];
     results.push({
@@ -58,6 +66,18 @@ export function gradeEndState(expect: Expectation, state: EndState): CheckResult
     });
   }
   return results;
+}
+
+/** Deterministic check on the wording: text that must never reach the customer. */
+export function gradeReplies(expect: Expectation, transcript: Transcript): CheckResult[] {
+  return (expect.replyMustNotContain ?? []).map((forbidden) => {
+    const leaked = transcript.turns.some((turn) => turn.agent.includes(forbidden));
+    return {
+      check: `no reply contains "${forbidden}"`,
+      passed: !leaked,
+      detail: leaked ? 'found in a reply' : 'not found',
+    };
+  });
 }
 
 export interface Transcript {

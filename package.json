@@ -7,8 +7,8 @@
     "db:down": "docker compose down",
     "api:dev": "pnpm --filter api start:dev",
     "web:dev": "pnpm --filter web dev",
-    "setup": "pnpm --filter api db:migrate && pnpm --filter api db:seed && pnpm --filter api policies:ingest",
-    "test": "pnpm --filter api test && pnpm --filter api test:e2e"
+    "test": "pnpm --filter api test && pnpm --filter api test:e2e",
+    "db:setup": "pnpm --filter api db:migrate && pnpm --filter api db:seed && pnpm --filter api policies:ingest"
   },
   "engines": {
     "node": ">=22"

@@ -70,7 +70,7 @@ Requisitos: Node 22+, pnpm 10+, Docker e uma chave da API da Anthropic.
 pnpm install
 cp .env.example .env              # depois preencha ANTHROPIC_API_KEY
 docker compose up -d              # Postgres (pgvector) e Redis
-pnpm setup                        # migrations, clientes de exemplo e políticas
+pnpm db:setup                     # migrations, clientes de exemplo e políticas
 pnpm api:dev                      # API em http://localhost:3000
 pnpm web:dev                      # interface em http://localhost:5173 (outro terminal)
 ```

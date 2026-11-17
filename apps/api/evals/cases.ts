@@ -103,7 +103,13 @@ export const CASES: EvalCase[] = [
     description: 'Duplicate charge is refunded even after 7 days',
     tag: 'refund',
     customer: 'david',
-    turns: ['I think I was charged twice for the same month. Can I get one of them back?', CONFIRM],
+    // The first message is a question, so the agent explains and offers. The
+    // customer then asks for it, and only then is there a card to confirm.
+    turns: [
+      'I think I was charged twice for the same month. Can I get one of them back?',
+      'Yes, please set up that refund.',
+      CONFIRM,
+    ],
     expect: { refund: 'refunded' },
   },
   {

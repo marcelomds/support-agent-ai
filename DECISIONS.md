@@ -77,3 +77,59 @@ enforce them.
 computed from a reference date (`SEED_NOW`, default: the current time).
 **Why:** "Charged yesterday" stays true whenever the seed runs, and evals can
 pin the date to get deterministic results.
+
+## 011 — Build first, explain afterwards
+**Decision:** The original plan was to teach each concept before writing its
+code. It changed to: build a working system, then study each concept on top of
+running code.
+**Why:** The project owner preferred to see it working first.
+**Consequence:** Phases 1, 2 and 4 and part of phase 3 were built in one pass.
+The study guide in `docs/pt-BR/02-guia-de-estudo.md` maps every concept to the
+file that implements it.
+
+## 012 — Model, effort and refusal fallback
+**Decision:** `claude-opus-5-5` by default (`ANTHROPIC_MODEL`), effort `low`
+(`AGENT_EFFORT`), and the server-side `fallbacks: "default"` option enabled.
+**Why:** A support chat is a short, tool-driven task where low effort is
+usually enough, and it keeps latency and cost down. The fallback makes the API
+retry on another model if a safety classifier declines a request, instead of
+failing the customer's message.
+**To measure:** Whether a cheaper model (Sonnet, Haiku) keeps the same eval
+score. That is a phase 5 and 7 question, not a guess to make now.
+
+## 013 — Customer confirmation is enforced by the prompt, not by code
+**Decision:** Before an action tool is called, the agent is instructed to
+state what will happen and wait for the customer's yes.
+**Limitation:** This is a prompt-level rule, so a model mistake or a prompt
+injection could skip the confirmation. What cannot be skipped is in code: the
+refund policy, the approval threshold, and the fact that tools only act on the
+signed-in customer.
+**Planned:** A code-level confirmation (the tool creates a pending action and
+the UI confirms it) in phase 7, measured by evals first.
+
+## 014 — Keyword search before embeddings
+**Decision:** `search_policies` uses Postgres full-text search for now.
+**Why:** It needs no second provider and no API key, and it will be half of
+the hybrid search anyway. Embeddings (pgvector) and queued ingestion (BullMQ)
+are still to be built; the embeddings provider is an open decision.
+
+## 015 — The model is replaceable in tests
+**Decision:** The loop depends on a small `ModelClient` interface. Tests use a
+`ScriptedModel` that returns prepared responses.
+**Why:** The loop, the tools and the HTTP API can be tested deterministically,
+for free, and in CI.
+**Limitation:** These tests prove the plumbing, not the model's judgment. How
+well the real model chooses tools and follows the rules is what evals measure.
+**Status:** The system has not been run against the real API yet. The session
+that built it had no API credentials.
+
+## 016 — E2E tests use their own database
+**Decision:** The e2e tests create and migrate `streambox_test` and reset it
+before each test.
+**Why:** The first version ran against the development database and wiped its
+data on every test run.
+
+## 017 — Plain CSS in the demo UI
+**Decision:** One CSS file, no Tailwind.
+**Why:** The UI is three small screens. A CSS framework would add a build
+dependency without teaching anything about the agent.

@@ -37,6 +37,12 @@ export const AuditIcon = () => (
   </svg>
 )
 
+export const MetricsIcon = () => (
+  <svg {...base}>
+    <path d="M4 20V10M10 20V4M16 20v-7M21 20H3" />
+  </svg>
+)
+
 export const GlobeIcon = () => (
   <svg {...base} width={16} height={16}>
     <circle cx="12" cy="12" r="9" />

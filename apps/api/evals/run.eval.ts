@@ -15,12 +15,12 @@ import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq } from 'drizzle-orm';
 import { estimateCostUsd } from '../src/agent/usage.js';
-import { ChatService } from '../src/chat/chat.service.js';
+import { ChatService, type ChatEvent, type ChatResult } from '../src/chat/chat.service.js';
+import { PendingActionsService } from '../src/chat/pending-actions.service.js';
 import type { Database } from '../src/db/database.module.js';
-import { plans, refunds, subscriptions } from '../src/db/schema.js';
+import { pendingActions as pendingActionsTable, plans, refunds, subscriptions } from '../src/db/schema.js';
 import { Embedder } from '../src/streambox/embedder.js';
 import { PolicyIngestion } from '../src/streambox/policy-ingestion.js';
-import { StreamboxTools } from '../src/streambox/tools.js';
 import { CUSTOMER, createTestApp } from '../test/setup.js';
 import { CASES, type EvalCase } from './cases.js';
 import { Judge, gradeEndState, gradeReplies, type CheckResult, type EndState, type Transcript } from './graders.js';
@@ -57,9 +57,9 @@ describe('agent evals', () => {
   let db: Database;
   let reseed: () => Promise<unknown>;
   let chat: ChatService;
+  let pendingActions: PendingActionsService;
   let judge: Judge;
   let model: string;
-  let writeTools: Set<string>;
   const rows: Row[] = [];
 
   beforeAll(async () => {
@@ -69,8 +69,8 @@ describe('agent evals', () => {
     if (!apiKey) throw new Error('Evals need ANTHROPIC_API_KEY in .env.');
     model = config.get<string>('ANTHROPIC_MODEL') ?? 'claude-opus-5-5';
     chat = app.get(ChatService);
+    pendingActions = app.get(PendingActionsService);
     judge = new Judge(apiKey, JUDGE_MODEL);
-    writeTools = new Set(app.get(StreamboxTools).all().filter((t) => t.kind === 'write').map((t) => t.name));
 
     // The policies the agent searches, embedded with the real model.
     const ingestion = new PolicyIngestion(db, app.get(Embedder));
@@ -121,17 +121,38 @@ describe('agent evals', () => {
   async function converse(evalCase: EvalCase, row: Row): Promise<Transcript> {
     const transcript: Transcript = { turns: [], tools: [] };
     let conversationId: string | undefined;
-    for (const message of evalCase.turns) {
+    for (const turn of evalCase.turns) {
       const pending: Transcript['tools'] = [];
-      const result = await chat.chat(
-        { customerId: CUSTOMER[evalCase.customer], conversationId, message, language: evalCase.language },
-        (event) => {
-          if (event.type === 'tool_call') pending.push({ name: event.name, input: event.input, ok: false, result: null });
-          if (event.type === 'tool_result') Object.assign(pending.at(-1)!, { ok: event.ok, result: event.result });
-        },
-      );
+      const onEvent = (event: ChatEvent) => {
+        if (event.type === 'tool_call') pending.push({ name: event.name, input: event.input, ok: false, result: null });
+        if (event.type === 'tool_result') Object.assign(pending.at(-1)!, { ok: event.ok, result: event.result });
+      };
+      const customerId = CUSTOMER[evalCase.customer];
+      let result: ChatResult;
+      let said: string;
+      if (typeof turn === 'string') {
+        said = turn;
+        result = await chat.chat({ customerId, conversationId, message: turn, language: evalCase.language }, onEvent);
+      } else {
+        // A button press needs a card on screen. With no card, the customer has nothing to press.
+        const card = conversationId ? await pendingActions.findPending(conversationId) : undefined;
+        if (!card) {
+          transcript.turns.push({ customer: `[no confirmation card was shown, so ${turn.press} could not be pressed]`, agent: '' });
+          continue;
+        }
+        said = `[pressed ${turn.press} on the confirmation card for ${card.tool}]`;
+        result = await chat.decide({ customerId, actionId: card.id, decision: turn.press, language: evalCase.language }, onEvent);
+        // What the button actually did, as an executed tool call.
+        const [stored] = await db.select().from(pendingActionsTable).where(eq(pendingActionsTable.id, card.id));
+        if (turn.press === 'confirm') {
+          pending.unshift({
+            name: card.tool, input: card.input, executed: true,
+            ok: !(stored.result as { error?: string } | null)?.error, result: stored.result,
+          });
+        }
+      }
       conversationId = result.conversationId;
-      transcript.turns.push({ customer: message, agent: result.reply });
+      transcript.turns.push({ customer: said, agent: result.reply });
       transcript.tools.push(...pending);
       row.modelCalls += result.steps;
       row.inputTokens += result.usage.inputTokens + result.usage.cacheReadTokens + result.usage.cacheWriteTokens;
@@ -161,9 +182,10 @@ describe('agent evals', () => {
             cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
           }
         : null,
-      // A denied refund request ran, but changed nothing.
+      // Only actions that really ran count: a proposal waiting on the card changed nothing,
+      // and neither did a refund request that was denied.
       successfulWrites: transcript.tools
-        .filter((tool) => writeTools.has(tool.name) && tool.ok)
+        .filter((tool) => tool.executed && tool.ok)
         .filter((tool) => (tool.result as { outcome?: string } | null)?.outcome !== 'denied')
         .map((tool) => tool.name),
     };

@@ -276,6 +276,24 @@ describe('API (e2e)', () => {
     );
   });
 
+  it('GET /metrics summarises runs, tools and confirmations', async () => {
+    await boot([...refundScript, fakeMessage([text('Refunded.')])]);
+    const { body } = await askForRefund(CUSTOMER.alice);
+    await decide(body.pendingAction.id, CUSTOMER.alice, 'confirm').expect(201);
+
+    const metrics = await request(app.getHttpServer()).get('/metrics').expect(200);
+    expect(metrics.body.totals).toMatchObject({ runs: 2, modelCalls: 4, inputTokens: 400, notCompleted: 0 });
+    expect(metrics.body.tools).toEqual(
+      expect.arrayContaining([
+        { name: 'list_payments', calls: 1, errors: 0 },
+        { name: 'propose:request_refund', calls: 1, errors: 0 },
+      ]),
+    );
+    expect(metrics.body.actions).toEqual({ confirmed: 1 });
+    expect(metrics.body.recent).toHaveLength(2);
+    expect(metrics.body.recent[0].customerName).toBe('Alice Martin');
+  });
+
   it('records one run with its cost for each answer', async () => {
     await boot([fakeMessage([toolUse('list_plans')]), fakeMessage([text('Three tiers.')])]);
     await request(app.getHttpServer())

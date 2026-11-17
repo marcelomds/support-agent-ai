@@ -4,10 +4,11 @@ import { getAccount, listCustomers, type Account, type Customer } from './api'
 import { Approvals } from './Approvals'
 import { Audit } from './Audit'
 import { Chat } from './Chat'
+import { Metrics } from './Metrics'
 import { LANGUAGES, useI18n, type Language } from './i18n'
-import { ApprovalIcon, AuditIcon, ChatIcon, GlobeIcon, Logo } from './icons'
+import { ApprovalIcon, AuditIcon, ChatIcon, GlobeIcon, Logo, MetricsIcon } from './icons'
 
-type Page = 'chat' | 'approvals' | 'audit'
+type Page = 'chat' | 'approvals' | 'audit' | 'metrics'
 
 export default function App() {
   const { t, language, setLanguage } = useI18n()
@@ -46,6 +47,7 @@ export default function App() {
     { id: 'chat', label: t.navChat, icon: <ChatIcon />, title: t.chatTitle, subtitle: t.chatSubtitle },
     { id: 'approvals', label: t.navApprovals, icon: <ApprovalIcon />, title: t.approvalsTitle, subtitle: t.approvalsSubtitle },
     { id: 'audit', label: t.navAudit, icon: <AuditIcon />, title: t.auditTitle, subtitle: t.auditSubtitle },
+    { id: 'metrics', label: t.navMetrics, icon: <MetricsIcon />, title: t.metricsTitle, subtitle: t.metricsSubtitle },
   ] as const
   const current = pages.find((p) => p.id === page)!
 
@@ -110,6 +112,7 @@ export default function App() {
         )}
         {page === 'approvals' && <Approvals />}
         {page === 'audit' && <Audit customerNames={customerNames} />}
+        {page === 'metrics' && <Metrics />}
       </main>
     </div>
   )

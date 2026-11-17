@@ -10,10 +10,10 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { DB, type Database } from '../db/database.module.js';
-import { auditLog, customers } from '../db/schema.js';
+import { agentRuns, auditLog, customers, pendingActions } from '../db/schema.js';
 import { AccountService } from '../streambox/account.service.js';
 import { RefundService } from '../streambox/refund.service.js';
 
@@ -65,6 +65,71 @@ export class AdminController {
     const parsed = Decision.safeParse(body);
     if (!parsed.success) throw new BadRequestException(z.prettifyError(parsed.error));
     return this.refunds.decide(id, parsed.data.decision, parsed.data.decidedBy);
+  }
+
+  /**
+   * Observability: what the agent costs and how it behaves, across every
+   * conversation. Read from the `agent_runs`, `audit_log` and
+   * `pending_actions` tables.
+   */
+  @Get('metrics')
+  async metrics() {
+    const [totals] = await this.db
+      .select({
+        runs: count(),
+        costMicroUsd: sql<number>`coalesce(sum(${agentRuns.costMicroUsd}), 0)::int`,
+        inputTokens: sql<number>`coalesce(sum(${agentRuns.inputTokens}), 0)::int`,
+        cachedTokens: sql<number>`coalesce(sum(${agentRuns.cachedTokens}), 0)::int`,
+        outputTokens: sql<number>`coalesce(sum(${agentRuns.outputTokens}), 0)::int`,
+        modelCalls: sql<number>`coalesce(sum(${agentRuns.modelCalls}), 0)::int`,
+        avgLatencyMs: sql<number>`coalesce(round(avg(${agentRuns.latencyMs})), 0)::int`,
+        p95LatencyMs: sql<number>`coalesce(round(percentile_cont(0.95) within group (order by ${agentRuns.latencyMs})), 0)::int`,
+        notCompleted: sql<number>`count(*) filter (where ${agentRuns.stopReason} <> 'completed')::int`,
+      })
+      .from(agentRuns);
+
+    const tools = await this.db
+      .select({
+        name: auditLog.action,
+        calls: count(),
+        errors: sql<number>`count(*) filter (where ${auditLog.result}->>'ok' = 'false')::int`,
+      })
+      .from(auditLog)
+      .where(eq(auditLog.actor, 'agent'))
+      .groupBy(auditLog.action)
+      .orderBy(desc(count()));
+
+    const actions = await this.db
+      .select({ status: pendingActions.status, count: count() })
+      .from(pendingActions)
+      .groupBy(pendingActions.status);
+
+    const recent = await this.db
+      .select({
+        id: agentRuns.id,
+        createdAt: agentRuns.createdAt,
+        customerName: customers.name,
+        model: agentRuns.model,
+        stopReason: agentRuns.stopReason,
+        modelCalls: agentRuns.modelCalls,
+        toolCalls: agentRuns.toolCalls,
+        inputTokens: agentRuns.inputTokens,
+        cachedTokens: agentRuns.cachedTokens,
+        outputTokens: agentRuns.outputTokens,
+        costMicroUsd: agentRuns.costMicroUsd,
+        latencyMs: agentRuns.latencyMs,
+      })
+      .from(agentRuns)
+      .leftJoin(customers, eq(agentRuns.customerId, customers.id))
+      .orderBy(desc(agentRuns.id))
+      .limit(20);
+
+    return {
+      totals,
+      tools,
+      actions: Object.fromEntries(actions.map((row) => [row.status, row.count])),
+      recent,
+    };
   }
 
   @Get('audit')

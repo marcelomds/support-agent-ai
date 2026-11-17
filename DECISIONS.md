@@ -104,8 +104,7 @@ state what will happen and wait for the customer's yes.
 injection could skip the confirmation. What cannot be skipped is in code: the
 refund policy, the approval threshold, and the fact that tools only act on the
 signed-in customer.
-**Planned:** A code-level confirmation (the tool creates a pending action and
-the UI confirms it) in phase 7, measured by evals first.
+**Superseded by 025:** actions now need a button press, enforced in code.
 
 ## 014 — Keyword search before embeddings
 **Decision:** `search_policies` uses Postgres full-text search for now.
@@ -235,3 +234,43 @@ judge has not been calibrated against human labels.
 **Not in CI yet:** Evals call the real model and cost money per run. They run
 on demand (`pnpm --filter api evals`); a CI job needs a repository secret and
 is a later step.
+
+## 025 — Actions need a button press, enforced in code
+**Decision:** A write tool no longer runs when the agent calls it. The loop
+has a gate (`interceptWrite`) that previews the action, stores it as a pending
+action and tells the model nothing has changed. The UI shows a card with
+Confirm and Cancel. Only the customer's Confirm executes the tool.
+**Why:** Decision 013 left confirmation to the prompt. The first eval run
+showed the model following that rule, but a rule the model can be argued out
+of is not a control. Now no wording in the chat can execute an action,
+because the chat never reaches the code that executes it.
+**Preview by dry run:** The card shows what the real code would do: the
+service runs inside a transaction that is rolled back. The preview cannot
+drift from the behaviour because it is the behaviour.
+**Rules run twice:** Once for the preview and again on Confirm, since the
+account may have changed in between. Cards expire after 15 minutes, a new
+proposal replaces an open one, and a card can only be confirmed by the
+customer it was shown to, once.
+**How the agent learns the result:** After the button press the application
+adds a `system` message to the conversation with the outcome. That channel is
+the application speaking; a customer cannot produce one by typing.
+**Cost:** One more step for the customer, and a model that supports system
+messages inside the conversation.
+**A request that would be denied** (for example, a refund outside the window)
+is answered at once, with no card: there is nothing to confirm.
+
+## 026 — Metrics from recorded runs, not a tracing stack
+**Decision:** Every answer is stored as one row in `agent_runs` (model calls,
+tool calls, tokens, cached tokens, cost, latency, how it ended) and logged as
+one JSON line. A metrics page reads those rows, the audit log and the pending
+actions.
+**Why not OpenTelemetry yet:** Tracing pays off when a request crosses several
+services. Here there is one process, and the audit log already records each
+tool call in order. A tracing backend would be one more thing to run for
+whoever clones the repository.
+**What it answers today:** cost per answer, average and 95th-percentile time,
+share of input served from cache, which tools are used and fail, and how many
+confirmation cards are confirmed or cancelled.
+**Not built:** alerts, per-step timing inside an answer, and model routing.
+Routing (a cheaper model for simple questions) is now a measurable question:
+run the evals with another `ANTHROPIC_MODEL` and compare score and cost.

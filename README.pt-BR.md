@@ -33,6 +33,31 @@ mão sobre o SDK do modelo, para que cada passo fique visível.
 - **Modelo:** API da Anthropic pelo SDK oficial
 - **Frontend:** React + Vite (entra quando uma fase precisar)
 
+## Como rodar
+
+Requisitos: Node 22+, pnpm 10+, Docker.
+
+```bash
+pnpm install
+cp .env.example .env
+docker compose up -d              # Postgres (pgvector) e Redis
+pnpm --filter api db:migrate      # cria as tabelas
+pnpm --filter api db:seed         # carrega os clientes de exemplo
+pnpm api:dev                      # http://localhost:3000
+```
+
+Confira se está no ar:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Rode os testes (os testes e2e precisam do banco no ar):
+
+```bash
+pnpm api:test
+```
+
 ## Documentação
 
 - [Passo 1: schema do banco e ferramentas do agente](docs/pt-BR/01-schema-e-ferramentas.md)

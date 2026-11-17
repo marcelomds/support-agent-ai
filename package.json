@@ -1,0 +1,15 @@
+{
+  "name": "support-agent-ai",
+  "private": true,
+  "description": "AI customer support agent built from scratch: tool use, agent loop, RAG, MCP, evals and production guardrails.",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "api:dev": "pnpm --filter api start:dev",
+    "api:test": "pnpm --filter api test && pnpm --filter api test:e2e"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

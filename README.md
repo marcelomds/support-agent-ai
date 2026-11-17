@@ -33,6 +33,31 @@ hand on top of the model SDK, so every step is visible.
 - **Model:** Anthropic API through the official SDK
 - **Frontend:** React + Vite (added when a phase needs it)
 
+## Getting started
+
+Requirements: Node 22+, pnpm 10+, Docker.
+
+```bash
+pnpm install
+cp .env.example .env
+docker compose up -d              # Postgres (pgvector) and Redis
+pnpm --filter api db:migrate      # create the tables
+pnpm --filter api db:seed         # load the sample customers
+pnpm api:dev                      # http://localhost:3000
+```
+
+Check that it is running:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Run the tests (the e2e tests need the database running):
+
+```bash
+pnpm api:test
+```
+
 ## Documentation
 
 - [Step 1: database schema and agent tools](docs/01-schema-and-tools.md)

@@ -163,5 +163,8 @@ both self-hosted through `@fontsource`.
 **Why:** The first version used system fonts and an indigo accent on grey,
 which reads as a generic generated UI. A fictional company still needs an
 identity for the demo to look like a product.
-**How:** Every colour is a CSS variable in `apps/web/src/index.css`, with a
-dark-theme set, so the theme can be changed in one place.
+**How:** Every colour is a CSS variable in `apps/web/src/index.css`, so the
+theme can be changed in one place.
+**Light theme only:** A dark variant existed for one commit and followed the
+system setting. It was removed because the light theme is the chosen look for
+the demo and should be the same on every machine.

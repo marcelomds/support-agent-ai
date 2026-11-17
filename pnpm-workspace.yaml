@@ -3,3 +3,8 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+  - onnxruntime-node
+  - msgpackr-extract
+
+ignoredBuiltDependencies:
+  - protobufjs

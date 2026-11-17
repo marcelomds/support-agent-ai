@@ -168,3 +168,47 @@ theme can be changed in one place.
 **Light theme only:** A dark variant existed for one commit and followed the
 system setting. It was removed because the light theme is the chosen look for
 the demo and should be the same on every machine.
+
+## 021 — A local embedding model
+**Decision:** Embeddings come from `multilingual-e5-small`, run inside the API
+process with `@huggingface/transformers`. No API key and no cost per call.
+**Alternatives:** Voyage AI and OpenAI: better quality, but a second paid
+account and key for anyone who clones the repository.
+**Why this model:** It is small (about 120 MB, 384 dimensions) and
+multilingual, so a question in Portuguese or Spanish finds policy text written
+in English. That matters because the UI offers three languages and the
+policies exist in one.
+**Trade-offs:** Lower quality than the paid models, a download on first use,
+and the first search after a restart is slower while the model loads.
+**Testing:** The search depends on an `Embedder` interface. Tests use a
+deterministic word-hash stand-in, so they need no download; they prove the
+pipeline, not the quality of the real model.
+
+## 022 — Hybrid search with reciprocal rank fusion
+**Decision:** `search_policies` runs a keyword search (Postgres full-text) and
+a meaning search (pgvector, cosine distance) and merges them with reciprocal
+rank fusion.
+**Why both:** Keywords are exact on terms such as "duplicate charge" but miss
+paraphrases and other languages. Embeddings catch those but can rank a
+generic section above the one with the exact term.
+**Why this fusion:** It only uses positions in each list, so the two different
+score scales never have to be compared, and it has nothing to tune.
+**Not done:** A reranking step. With 18 sections there is nothing for it to
+improve; it becomes relevant with hundreds of documents.
+**Similarity floor:** A vector search always returns its nearest rows, even
+for an unrelated question, so sections below `EMBEDDING_MIN_SIMILARITY` are
+dropped. If the model is unavailable the search falls back to keywords only.
+
+## 023 — Ingestion through a queue
+**Decision:** `policies:ingest` puts one BullMQ job per document on a Redis
+queue; a worker chunks, embeds and stores each one, with 3 attempts and
+exponential backoff.
+**Why a queue for four files:** It is the realistic shape of the problem.
+Embedding is slow and can fail, so it should not run inside a web request and
+a failure should be retried, not lost.
+**Simplification:** By default the command enqueues and runs the worker in the
+same process, so setup stays one step. `--enqueue` and `--worker` run the two
+halves separately, as they would in production.
+**Tried and failed:** Passing connection options to BullMQ 6. In an ES module
+project it cannot load `ioredis` itself; it needs an already-constructed
+client, so `ioredis` is a direct dependency.

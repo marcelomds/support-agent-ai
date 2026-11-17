@@ -19,7 +19,7 @@ hand on top of the model SDK, so every step is visible.
 |---|---|---|---|
 | 1 | Database with sample data, endpoint that talks to the model | LLM via API: stateless calls, tokens, cost, streaming | ✅ built |
 | 2 | Read tools and a hand-written agent loop | Tool use, agent loop, prompt caching | ✅ built |
-| 3 | Policy documents and retrieval | Keyword search today; embeddings, hybrid search and queued ingestion next | 🚧 partial |
+| 3 | Policy documents, queued ingestion and retrieval | Embeddings, hybrid search (keyword + meaning), queues | ✅ built |
 | 4 | Action tools with business rules and human approval | Guardrails, human in the loop, audit trail | ✅ built |
 | 5 | Evals running in CI, accuracy as a number | Evals, LLM-as-judge | ⏳ |
 | 6 | MCP server and skills | MCP, skills | ⏳ |
@@ -71,6 +71,7 @@ pnpm install
 cp .env.example .env              # then set ANTHROPIC_API_KEY
 docker compose up -d              # Postgres (pgvector) and Redis
 pnpm db:setup                     # migrations, sample customers, policy documents
+                                  # (the first run downloads a 120 MB embedding model)
 pnpm api:dev                      # API on http://localhost:3000
 pnpm web:dev                      # UI on http://localhost:5173 (second terminal)
 ```

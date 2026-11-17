@@ -20,6 +20,7 @@ import {
   text,
   timestamp,
   uuid,
+  vector,
 } from 'drizzle-orm/pg-core';
 
 export const planTier = pgEnum('plan_tier', ['basic', 'standard', 'premium']);
@@ -190,11 +191,14 @@ export const auditLog = pgTable(
   (t) => [index('audit_log_customer_id_idx').on(t.customerId)],
 );
 
+/** Size of the vectors produced by the embedding model (multilingual-e5-small). */
+export const EMBEDDING_DIMENSIONS = 384;
+
 const tsvector = customType<{ data: string }>({
   dataType: () => 'tsvector',
 });
 
-/** Policy documents split into sections, searchable by keyword. */
+/** Policy documents split into sections, searchable by keyword and by meaning. */
 export const policyChunks = pgTable(
   'policy_chunks',
   {
@@ -205,8 +209,17 @@ export const policyChunks = pgTable(
     searchVector: tsvector('search_vector').generatedAlwaysAs(
       sql`to_tsvector('english', heading || ' ' || content)`,
     ),
+    /**
+     * The section's meaning as a list of numbers (an embedding). Two texts
+     * about the same subject get vectors that point in a similar direction,
+     * even when they share no words. Null until the section is embedded.
+     */
+    embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }),
   },
-  (t) => [index('policy_chunks_search_idx').using('gin', t.searchVector)],
+  (t) => [
+    index('policy_chunks_search_idx').using('gin', t.searchVector),
+    index('policy_chunks_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops')),
+  ],
 );
 
 export type Plan = typeof plans.$inferSelect;

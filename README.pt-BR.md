@@ -19,7 +19,7 @@ mão sobre o SDK do modelo, para que cada passo fique visível.
 |---|---|---|---|
 | 1 | Banco com dados de exemplo e endpoint que conversa com o modelo | LLM via API: chamadas sem estado, tokens, custo, streaming | ✅ feito |
 | 2 | Ferramentas de leitura e loop do agente feito na mão | Tool use, loop de agente, prompt caching | ✅ feito |
-| 3 | Documentos de política e busca | Hoje busca por palavra-chave; faltam embeddings, busca híbrida e ingestão com fila | 🚧 parcial |
+| 3 | Documentos de política, ingestão com fila e busca | Embeddings, busca híbrida (palavra-chave + significado), filas | ✅ feito |
 | 4 | Ferramentas de ação com regras de negócio e aprovação humana | Guardrails, humano no circuito, auditoria | ✅ feito |
 | 5 | Evals rodando no CI, com o acerto medido em número | Evals, LLM-as-judge | ⏳ |
 | 6 | Servidor MCP e skills | MCP, skills | ⏳ |
@@ -71,6 +71,7 @@ pnpm install
 cp .env.example .env              # depois preencha ANTHROPIC_API_KEY
 docker compose up -d              # Postgres (pgvector) e Redis
 pnpm db:setup                     # migrations, clientes de exemplo e políticas
+                                  # (a primeira vez baixa um modelo de embeddings de 120 MB)
 pnpm api:dev                      # API em http://localhost:3000
 pnpm web:dev                      # interface em http://localhost:5173 (outro terminal)
 ```

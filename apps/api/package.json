@@ -13,7 +13,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "oxlint --type-aware src/ test/",
+    "lint": "oxlint --type-aware src/ test/ evals/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
@@ -23,7 +23,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "typecheck": "tsc --noEmit",
-    "policies:ingest": "tsx src/streambox/ingest-policies.ts"
+    "policies:ingest": "tsx src/streambox/ingest-policies.ts",
+    "evals": "vitest run --config ./vitest.config.evals.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",

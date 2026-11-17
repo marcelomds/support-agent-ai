@@ -212,3 +212,26 @@ halves separately, as they would in production.
 **Tried and failed:** Passing connection options to BullMQ 6. In an ES module
 project it cannot load `ioredis` itself; it needs an already-constructed
 client, so `ioredis` is a direct dependency.
+
+## 024 — Evals grade the end state first, and a judge only where code cannot
+**Decision:** Each eval case is a short conversation with one sample customer.
+It is graded by (1) what is in the database afterwards and (2) statements
+about the final reply, each marked true or false by a second model.
+**Why the end state:** For an agent that acts, the question is what it did,
+not what it said. "Was a refund issued?" has one right answer and needs no
+opinion. Tool-call sequences are not checked, so the agent is free to reach
+the right outcome by a different route.
+**Why a judge at all:** Some expectations are about wording ("explains the
+7-day rule", "is written in Portuguese"). Each statement is one call with a
+structured true/false verdict, so a failure names the exact statement.
+**Judge model:** `claude-haiku-5-5`, a different model from the agent, to
+reduce the bias of a model grading its own style.
+**Harness errors are not agent failures:** A timeout or API error is reported
+as "could not be graded" and left out of the score.
+**Honest limits:** 17 cases give a margin of roughly ±24 points, so the score
+can show a broken agent but not a 5-point improvement. The cases were drafted
+from the sample scenarios and are pending the project owner's review. The
+judge has not been calibrated against human labels.
+**Not in CI yet:** Evals call the real model and cost money per run. They run
+on demand (`pnpm --filter api evals`); a CI job needs a repository secret and
+is a later step.

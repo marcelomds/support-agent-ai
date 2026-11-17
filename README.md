@@ -21,7 +21,7 @@ hand on top of the model SDK, so every step is visible.
 | 2 | Read tools and a hand-written agent loop | Tool use, agent loop, prompt caching | ✅ built |
 | 3 | Policy documents, queued ingestion and retrieval | Embeddings, hybrid search (keyword + meaning), queues | ✅ built |
 | 4 | Action tools with business rules and human approval | Guardrails, human in the loop, audit trail | ✅ built |
-| 5 | Evals running in CI, accuracy as a number | Evals, LLM-as-judge | ⏳ |
+| 5 | Evals with the real model, accuracy as a number | Evals, end-state grading, LLM-as-judge | 🚧 built, first run pending |
 | 6 | MCP server and skills | MCP, skills | ⏳ |
 | 7 | Observability, prompt injection defense | Tracing, model routing | ⏳ |
 
@@ -99,6 +99,20 @@ Run the tests (they create and use a separate `streambox_test` database):
 ```bash
 pnpm test
 ```
+
+## Evals
+
+Tests check the plumbing with a scripted model. Evals check the real model:
+17 short conversations, each graded by what ended up in the database and by
+statements about the reply that a second model marks true or false.
+
+```bash
+pnpm --filter api evals
+```
+
+This calls the Anthropic API (about $1 per full run) and writes
+`apps/api/evals/results/latest.md`. Cases live in
+[`apps/api/evals/cases.ts`](apps/api/evals/cases.ts).
 
 ## Documentation
 

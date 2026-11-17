@@ -12,14 +12,20 @@ import { WordHashEmbedder } from '../src/streambox/testing.js';
 /** Every e2e test sees the sample data as of this moment. */
 export const NOW = new Date('2026-01-15T12:00:00Z');
 
-/** Boots the real app against the real database, with a fixed clock and a fake model. */
-export async function createTestApp(model?: ModelClient) {
+export interface TestAppOptions {
+  /** 'stand-in' (default) needs no download; 'real' loads the actual embedding model. */
+  embedder?: 'stand-in' | 'real';
+}
+
+/** Boots the real app against the real database, with a fixed clock and, optionally, a fake model. */
+export async function createTestApp(model?: ModelClient, options: TestAppOptions = {}) {
   const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(Clock)
-    .useValue({ now: () => NOW })
+    .useValue({ now: () => NOW });
+  if (options.embedder !== 'real') {
     // The real embedding model needs a 120 MB download; tests use a stand-in.
-    .overrideProvider(Embedder)
-    .useValue(new WordHashEmbedder());
+    builder.overrideProvider(Embedder).useValue(new WordHashEmbedder());
+  }
   if (model) builder.overrideProvider(MODEL_CLIENT).useValue(model);
 
   const moduleRef = await builder.compile();
